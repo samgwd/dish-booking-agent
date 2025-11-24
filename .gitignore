@@ -84,3 +84,4 @@ Thumbs.db
 # Logs
 *.log
 curl
+mcp_config.json
