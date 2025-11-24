@@ -13,6 +13,7 @@ dependencies = [
 
 # mypy configuration
 [tool.mypy]
+python_executable = ".venv/bin/python"
 show_error_codes = true
 exclude = ["docs", "tests", "LICENSE"]
 strict = true

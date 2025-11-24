@@ -61,8 +61,8 @@ Example prompts:
 
 ## Manual Test Flows
 
-1) Start Dish MCP on :8000 and Google Calendar MCP on :3000 (or your configured ports), then run the agent.  
-2) Ask the agent to list upcoming events for a specific day.  
-3) Ask it to book a room in Dish and create a matching Google Calendar event with the same time and title.  
-4) Ask it to reschedule or cancel a calendar event and confirm the change.  
+1) Start Dish MCP on :8000 and Google Calendar MCP on :3000 (or your configured ports), then run the agent.
+2) Ask the agent to list upcoming events for a specific day.
+3) Ask it to book a room in Dish and create a matching Google Calendar event with the same time and title.
+4) Ask it to reschedule or cancel a calendar event and confirm the change.
 If the model confuses Dish vs. Calendar responsibilities, tweak the namespaces or prompts as needed.
