@@ -1,0 +1,104 @@
+---
+description: Code quality practices and error handling guidelines
+alwaysApply: false
+---
+# Code Quality Practices
+
+## Error Suppression Guidelines
+
+### Using `type: ignore` and `noqa`
+
+**Before adding suppressions, ask:**
+1. Is this truly necessary?
+2. What is the root cause of the issue?
+3. Could refactoring or a different approach avoid this?
+4. Is there a more specific way to suppress only the relevant error?
+
+### Required Documentation
+When you must use `type: ignore` or `noqa`:
+
+1. **Justify in the PR description** where it's introduced
+2. **Add inline comment** if the reason isn't obvious from context
+3. **Use specific error codes** when possible (e.g., `noqa: E501` instead of `noqa`)
+
+### Examples
+
+**Good usage with justification:**
+```python
+# mypy doesn't recognise dynamically added attributes from SQLAlchemy
+user.dynamic_attribute = value  # type: ignore[attr-defined]
+
+# Line length exception for long URL that shouldn't be broken
+VERY_LONG_API_ENDPOINT = "https://api.example.com/v1/very/long/endpoint/path/that/breaks/our/line/limit"  # noqa: E501
+```
+
+**Better alternatives to consider:**
+```python
+# Instead of type: ignore, use proper typing
+from typing import cast, Any
+
+# Instead of suppressing, refactor
+def process_data(
+    data: dict[str, Any]
+) -> ProcessedData:
+    # More explicit typing helps avoid type: ignore
+    return ProcessedData(**data)
+
+# Instead of noqa for long lines, consider refactoring
+API_BASE = "https://api.example.com"
+ENDPOINT_PATH = "/v1/very/long/endpoint/path"
+FULL_ENDPOINT = f"{API_BASE}{ENDPOINT_PATH}"
+```
+
+### When Suppressions Are Acceptable
+
+**Acceptable reasons:**
+- Third-party library limitations that can't be worked around
+- Legacy code that would require extensive refactoring to fix
+- Platform-specific code where certain warnings don't apply
+- Generated code that shouldn't be manually modified
+
+**Unacceptable reasons:**
+- Convenience to avoid fixing the underlying issue
+- Time pressure (create a technical debt ticket instead)
+- "It works fine as is" without understanding the warning
+- Avoiding learning the proper solution
+
+## Testing Standards
+
+### Test Coverage
+- New functionality should include appropriate tests
+- Aim for meaningful test coverage, not just high percentages
+- Test edge cases and error conditions
+- Use descriptive test names that explain what is being tested
+
+### Test Naming
+```python
+def test_calculate_total_with_valid_inputs_returns_correct_sum():
+    """Test that calculate_total returns correct sum for valid inputs."""
+    pass
+
+def test_calculate_total_with_negative_price_raises_value_error():
+    """Test that calculate_total raises ValueError for negative price."""
+    pass
+```
+
+## Performance Considerations
+
+### Efficient Code Patterns
+- Use list comprehensions judiciously (not always faster)
+- Consider generator expressions for large datasets
+- Profile before optimising for performance
+- Document performance-critical sections
+
+```python
+# Good: Generator for memory efficiency with large datasets
+def process_large_dataset(data_source):
+    """Process large dataset efficiently using generators."""
+    return (transform_item(item) for item in data_source if item.is_valid)
+
+# Consider: List comprehension for smaller, frequently accessed data
+def get_valid_items(items: list[Item]) -> list[Item]:
+    """Get valid items from a small list."""
+    return [item for item in items if item.is_valid]
+```

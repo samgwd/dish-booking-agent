@@ -1,0 +1,123 @@
+---
+description: Docstring formatting and documentation standards
+alwaysApply: false
+---
+# Docstring Standards
+
+## General Guidelines
+- Follow Google's docstring format
+- For functions with type annotations, **do not** include types in parentheses next to argument names in docstrings
+- Exception: Include types if needed for consistency with existing repository or to expose type information via `__doc__`
+
+## Standard Function Docstrings
+
+**With type annotations (preferred):**
+```python
+def calculate_total(price: float, tax_rate: float, discount: float = 0.0) -> float:
+    """Calculate the total price including tax and discount.
+    
+    Args:
+        price: The base price before tax and discount
+        tax_rate: The tax rate as a decimal (e.g., 0.08 for 8%)
+        discount: The discount amount to subtract from the base price
+        
+    Returns:
+        The final total price after applying tax and discount
+        
+    Raises:
+        ValueError: If price or tax_rate is negative
+    """
+    pass
+```
+
+**Without type annotations (legacy code):**
+```python
+def calculate_total(price, tax_rate, discount=0.0):
+    """Calculate the total price including tax and discount.
+    
+    Args:
+        price (float): The base price before tax and discount
+        tax_rate (float): The tax rate as a decimal (e.g., 0.08 for 8%)
+        discount (float): The discount amount to subtract from the base price
+        
+    Returns:
+        float: The final total price after applying tax and discount
+        
+    Raises:
+        ValueError: If price or tax_rate is negative
+    """
+    pass
+```
+
+## Pandas DataFrame Documentation
+
+When using DataFrames as parameters or return values, use this format:
+
+```python
+def process_sales_data(input_df: pd.DataFrame) -> pd.DataFrame:
+    """Process sales data and add calculated columns.
+
+    Args:
+        input_df: Sales transaction data
+            Index:
+                RangeIndex
+            Columns:
+                Name: Date, dtype: datetime64[ns]
+                Name: Product, dtype: object
+                Name: Quantity, dtype: int64
+                Name: Price, dtype: float64
+
+    Returns:
+        Processed sales data with additional calculated columns
+            Index:
+                RangeIndex
+            Columns:
+                Name: Date, dtype: datetime64[ns]
+                Name: Product, dtype: object
+                Name: Quantity, dtype: int64
+                Name: Price, dtype: float64
+                Name: Total, dtype: float64
+                Name: Category, dtype: object
+    """
+    pass
+```
+
+## Class Docstrings
+
+```python
+class UserManager:
+    """Manages user authentication and profile operations.
+    
+    This class handles user registration, authentication, and profile
+    management operations. It integrates with the database layer and
+    provides validation for user data.
+    
+    Attributes:
+        db_connection: Database connection instance
+        cache_timeout: Cache timeout in seconds for user sessions
+        
+    Example:
+        >>> manager = UserManager(db_conn)
+        >>> user = manager.authenticate("username", "password")
+        >>> manager.update_profile(user.id, {"email": "new@example.com"})
+    """
+    pass
+```
+
+## Module-Level Docstrings
+
+```python
+"""User management utilities and classes.
+
+This module provides functionality for managing user accounts, including
+authentication, profile management, and session handling. It serves as
+the main interface between the application and user-related database
+operations.
+
+Typical usage example:
+    from user_management import UserManager
+    
+    manager = UserManager(database_connection)
+    authenticated_user = manager.authenticate(username, password)
+"""
+```
