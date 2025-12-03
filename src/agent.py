@@ -2,15 +2,17 @@
 
 import asyncio
 import traceback
+from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import datetime
 
 from dotenv import load_dotenv
 from mcp import ClientSession
-from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.messages import ModelMessage
-
+from mcp_formatting import describe_tool_call
 from mcp_loader import load_mcp_servers_with_env
+from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai.messages import AgentStreamEvent, FunctionToolCallEvent, ModelMessage
+from pydantic_ai.tools import RunContext
 
 load_dotenv()
 
@@ -22,12 +24,24 @@ class AgentDeps:
     sessions: dict[str, ClientSession]
 
 
+async def log_mcp_activity(
+    _run_ctx: RunContext[AgentDeps], events: AsyncIterable[AgentStreamEvent]
+) -> None:
+    """Event handler that logs whenever the agent triggers an MCP tool."""
+    async for event in events:
+        if isinstance(event, FunctionToolCallEvent) and (
+            message := describe_tool_call(event.part.tool_name, event.part.args_as_dict())
+        ):
+            print(f"\n[MCP] {message}", flush=True)
+
+
 mcp_toolsets = load_mcp_servers_with_env("mcp_config.json")
 
 agent = Agent(
     "openai:gpt-5-nano",
     deps_type=AgentDeps,
     toolsets=mcp_toolsets,
+    event_stream_handler=log_mcp_activity,
     system_prompt=(
         "You manage both office room bookings (Dish MCP) and Google Calendar for the user. "
         "Use Dish tools for room availability and booking; use Google Calendar tools to list "
@@ -62,10 +76,14 @@ async def process_message(
                 user_input,
                 message_history=message_history,
             ) as result:
-                print("Agent: ", end="", flush=True)
+                text_started = False
                 async for text in result.stream_text(delta=True):
+                    if not text_started:
+                        print("Agent: ", end="", flush=True)
+                        text_started = True
                     print(text, end="", flush=True)
-        print()
+        if text_started:
+            print()
         return list(captured_messages)
     except Exception as e:
         print(f"Error: {e}")
