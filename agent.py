@@ -8,8 +8,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 from mcp import ClientSession
 from pydantic_ai import Agent, capture_run_messages
-from pydantic_ai.mcp import load_mcp_servers
 from pydantic_ai.messages import ModelMessage
+
+from mcp_loader import load_mcp_servers_with_env
 
 load_dotenv()
 
@@ -21,7 +22,7 @@ class AgentDeps:
     sessions: dict[str, ClientSession]
 
 
-mcp_toolsets = load_mcp_servers("mcp_config.json")
+mcp_toolsets = load_mcp_servers_with_env("mcp_config.json")
 
 agent = Agent(
     "openai:gpt-5-nano",
@@ -43,16 +44,44 @@ agent = Agent(
 )
 
 
+async def process_message(
+    user_input: str, message_history: list[ModelMessage]
+) -> list[ModelMessage]:
+    """Process a user message and return updated message history.
+
+    Args:
+        user_input: The user's input message.
+        message_history: The history of messages between the user and the agent.
+
+    Returns:
+        The updated message history.
+    """
+    try:
+        with capture_run_messages() as captured_messages:
+            async with agent.run_stream(
+                user_input,
+                message_history=message_history,
+            ) as result:
+                print("Agent: ", end="", flush=True)
+                async for text in result.stream_text(delta=True):
+                    print(text, end="", flush=True)
+        print()
+        return list(captured_messages)
+    except Exception as e:
+        print(f"Error: {e}")
+        traceback.print_exc()
+        return message_history
+
+
 async def main() -> None:
     """Main function for the Dish Booking Agent."""
-    print("\nAgent is ready! Type 'quit' to exit.")
-    print("Type 'reset' to clear the conversation history.")
-    print("-" * 50)
-
     message_history: list[ModelMessage] = []
 
     # Use async context manager to keep MCP server connections alive
     async with agent:
+        print("\nAgent is ready! Type 'quit' to exit.")
+        print("Type 'reset' to clear the conversation history.")
+        print("-" * 50)
         while True:
             user_input = input("You: ")
             if user_input.lower() in ["quit", "exit"]:
@@ -63,17 +92,7 @@ async def main() -> None:
                 print("Agent: Conversation history cleared.")
                 continue
 
-            try:
-                with capture_run_messages() as captured_messages:
-                    result = await agent.run(
-                        user_input,
-                        message_history=message_history,
-                    )
-                message_history = list(captured_messages)
-                print(f"Agent: {result.output}")
-            except Exception as e:
-                print(f"Error: {e}")
-                traceback.print_exc()
+            message_history = await process_message(user_input, message_history)
 
 
 if __name__ == "__main__":
