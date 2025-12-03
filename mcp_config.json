@@ -1,16 +1,16 @@
 {
     "mcpServers": {
         "dish-mcp": {
-            "command": "<PATH_TO_DISH_MCP_VENV>/bin/fastmcp",
+            "command": "${DISH_MCP_PATH}/.venv/bin/fastmcp",
             "args": [
                 "run",
-                "<PATH_TO_DISH_MCP_SRC>/mcp_server.py"
+                "${DISH_MCP_PATH}/src/mcp_server.py"
             ],
-            "cwd": "<PATH_TO_DISH_MCP>",
+            "cwd": "${DISH_MCP_PATH}",
             "env": {
-                "DISH_COOKIE": "<YOUR_DISH_COOKIE>",
-                "TEAM_ID": "<YOUR_TEAM_ID>",
-                "MEMBER_ID": "<YOUR_MEMBER_ID>"
+                "DISH_COOKIE": "${DISH_COOKIE}",
+                "TEAM_ID": "${TEAM_ID}",
+                "MEMBER_ID": "${MEMBER_ID}"
             },
             "transport": "stdio"
         },
@@ -21,7 +21,7 @@
                 "--rm",
                 "-i",
                 "--mount",
-                "type=bind,src=<PATH_TO_GOOGLE_CALENDAR_MCP_GCP_OAUTH_KEYS_JSON>,dst=/app/gcp-oauth.keys.json",
+                "type=bind,src=${GOOGLE_OAUTH_CREDENTIALS},dst=/app/gcp-oauth.keys.json",
                 "--mount",
                 "type=volume,src=google-calendar-mcp_calendar-tokens,dst=/home/nodejs/.config/google-calendar-mcp",
                 "calendar-mcp"

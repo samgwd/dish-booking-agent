@@ -1,0 +1,75 @@
+---
+description: Python coding standards and style guidelines
+alwaysApply: false
+---
+# Python Coding Standards
+
+Follow these coding practices for all Python code:
+
+## Style Guide
+- Follow **Google's Python Style Guide**: https://google.github.io/styleguide/pyguide.html
+- Use **100 characters** as the maximum line length (not 88)
+- Use British English spelling in comments, docstrings, and variable names
+
+## Variable Naming
+- **Never use single letter variable names**
+- Rare exceptions only for variables local to a single line when absolutely necessary
+- Use descriptive, meaningful names that clearly indicate the variable's purpose
+
+## Comments
+- **Inline comments should be rare** and used sparingly
+- Comments should explain **why** something is done, not **what** is being done
+- Use inline comments only for:
+  - Explaining non-obvious, complex logic
+  - Providing additional context that isn't clear from the code
+  - Explaining business logic or domain-specific requirements
+
+## Code Quality
+- Avoid `type: ignore` and `noqa` directives unless absolutely necessary
+- When using `type: ignore` or `noqa`:
+  - Ensure it's genuinely necessary
+  - Consider if refactoring could avoid the need for it
+  - Add justification in the PR description
+  - Add inline comment if the reason isn't obvious from context
+
+## Examples
+
+**Good variable naming:**
+```python
+user_email = get_user_email()
+total_revenue = calculate_revenue(transactions)
+is_authenticated = check_user_authentication()
+```
+
+**Bad variable naming:**
+```python
+e = get_user_email()  # Too short
+x = calculate_revenue(transactions)  # Meaningless
+flag = check_user_authentication()  # Too generic
+```
+
+**Good comment usage:**
+```python
+# Calculate tax using the current fiscal year rates (updated annually)
+tax_amount = gross_amount * TAX_RATE
+
+# Retry logic needed due to intermittent API timeouts
+for attempt in range(3):
+    try:
+        response = api_call()
+        break
+    except TimeoutError:
+        if attempt == 2:
+            raise
+        time.sleep(2 ** attempt)
+```
+
+**Bad comment usage:**
+```python
+# Calculate tax amount
+tax_amount = gross_amount * TAX_RATE  # This comment explains what, not why
+
+# Loop through items
+for item in items:  # Unnecessary comment
+    process_item(item)
+```

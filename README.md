@@ -1,6 +1,6 @@
-# Dish & Calendar Booking Agent
+# DiSH & Calendar Booking Agent
 
-Pydantic AI agent that connects to both the Dish room-booking MCP and the Google Calendar MCP. It can coordinate room bookings with your calendar availability.
+Pydantic AI agent that connects to both the DiSH room-booking MCP and the Google Calendar MCP. It can coordinate room bookings with your calendar availability.
 
 ## Setup
 
@@ -17,35 +17,15 @@ Pydantic AI agent that connects to both the Dish room-booking MCP and the Google
 3. Environment variables (e.g., in `.env`):
     - `OPENAI_API_KEY`
     - `DISH_COOKIE`
-    - `TEAM_ID` (optional for Dish booking)
-    - `MEMBER_ID` (optional for Dish booking)
+    - `TEAM_ID`
+    - `MEMBER_ID`
     - `DISH_MCP_SSE_URL` (default `http://127.0.0.1:8000/sse`)
     - `GCAL_MCP_SSE_URL` (default `http://127.0.0.1:3000/sse`)
     - `GOOGLE_OAUTH_CREDENTIALS` (path to your Google OAuth JSON for the calendar MCP)
 
-## Running MCP Servers (HTTP/SSE)
-
-Run each server in its own terminal.
-
-**Terminal 1: Dish MCP (port 8000 by default)**
-```bash
-cd ../dish-mcp
-uv run fastmcp run src/mcp_server.py --transport sse
-```
-
-**Terminal 2: Google Calendar MCP (port 3000 by default)**
-```bash
-cd ../google-calendar-mcp
-npm install          # first time only
-npm run auth
-npm run start:http
-# or: PORT=3000 TRANSPORT=http npm run start:http   # if you prefer explicit env
-```
-The calendar server exposes SSE at `http://127.0.0.1:3000/sse` by default; adjust `GCAL_MCP_SSE_URL` if you change host/port.
 
 ## Running the Agent
 
-**Terminal 3: Agent**
 ```bash
 cd ../dish-booking-agent
 uv run agent.py

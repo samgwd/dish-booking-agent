@@ -1,0 +1,196 @@
+---
+description: Python package development best practices and conventions
+alwaysApply: false
+---
+# Python Package Development Standards
+
+## Package Structure
+
+### Module Organisation
+- Keep `__init__.py` files minimal and focused
+- Use clear, descriptive module names
+- Organise related functionality into subpackages
+- Expose public API through `__init__.py` imports
+
+```python
+# Good: Clear public API in __init__.py
+from .core import MainClass, helper_function
+from .utils import validate_input
+from .exceptions import PackageError
+
+__all__ = ["MainClass", "helper_function", "validate_input", "PackageError"]
+```
+
+### Import Standards
+- Use absolute imports in package code
+- Group imports: standard library, third-party, local
+- Use `from typing import` for type hints
+- Avoid wildcard imports (`from module import *`)
+
+```python
+# Good import structure
+import os
+import sys
+from pathlib import Path
+
+import pandas as pd
+import requests
+
+from .core import BaseClass
+from .utils import helper_function
+```
+
+## Public API Design
+
+### Function and Class Design
+- Design for the user, not the implementation
+- Use descriptive parameter names
+- Provide sensible defaults where possible
+- Return consistent types
+
+```python
+def load_data(
+    file_path: str | Path,
+    *,
+    encoding: str = "utf-8",
+    validate: bool = True,
+    chunk_size: int | None = None
+) -> pd.DataFrame:
+    """Load data from file with validation and chunking support.
+    
+    Args:
+        file_path: Path to the data file
+        encoding: File encoding to use for reading
+        validate: Whether to validate data after loading
+        chunk_size: If provided, read file in chunks of this size
+        
+    Returns:
+        Loaded and optionally validated DataFrame
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If validation fails
+    """
+    pass
+```
+
+### Error Handling
+- Create package-specific exception classes
+- Provide clear, actionable error messages
+- Include relevant context in exceptions
+- Use British English in error messages
+
+```python
+class PackageError(Exception):
+    """Base exception for package-related errors."""
+    pass
+
+class ValidationError(PackageError):
+    """Raised when data validation fails."""
+    
+    def __init__(self, message: str, invalid_fields: list[str] | None = None):
+        super().__init__(message)
+        self.invalid_fields = invalid_fields or []
+
+# Usage
+def validate_user_data(data: dict) -> None:
+    """Validate user data dictionary."""
+    invalid_fields = []
+    
+    if "email" not in data:
+        invalid_fields.append("email")
+    if "username" not in data:
+        invalid_fields.append("username")
+        
+    if invalid_fields:
+        raise ValidationError(
+            f"Missing required fields: {', '.join(invalid_fields)}",
+            invalid_fields=invalid_fields
+        )
+```
+
+## Configuration and Settings
+
+### Package Configuration
+- Use `pyproject.toml` for modern Python packages
+- Include all necessary metadata
+- Specify minimum Python version requirements
+- Use semantic versioning
+
+### Environment Variables
+- Prefix environment variables with package name
+- Provide clear defaults
+- Document all environment variables
+
+```python
+import os
+from typing import Optional
+
+# Good: Namespaced environment variables
+DEFAULT_TIMEOUT = 30
+DEFAULT_RETRIES = 3
+
+def get_api_timeout() -> int:
+    """Get API timeout from environment or default."""
+    return int(os.getenv("MYPACKAGE_API_TIMEOUT", DEFAULT_TIMEOUT))
+
+def get_api_retries() -> int:
+    """Get API retry count from environment or default."""
+    return int(os.getenv("MYPACKAGE_API_RETRIES", DEFAULT_RETRIES))
+```
+
+## Testing in Packages
+
+### Test Organisation
+- Mirror package structure in tests
+- Use descriptive test file names (`test_module_name.py`)
+- Group related tests in classes
+- Test both success and failure cases
+
+### Fixtures and Test Data
+- Create reusable fixtures for common test data
+- Store test data files in `tests/data/` directory
+- Use temporary directories for file operations in tests
+
+```python
+import pytest
+import tempfile
+from pathlib import Path
+
+@pytest.fixture
+def sample_data():
+    """Provide sample data for testing."""
+    return {
+        "users": [
+            {"id": 1, "name": "Alice", "email": "alice@example.com"},
+            {"id": 2, "name": "Bob", "email": "bob@example.com"},
+        ]
+    }
+
+@pytest.fixture
+def temp_directory():
+    """Provide temporary directory for file operations."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield Path(temp_dir)
+```
+
+## Documentation Standards
+
+### README Structure
+- Clear installation instructions
+- Quick start example
+- Link to full documentation
+- Contributing guidelines
+- Licence information
+
+### Changelog Maintenance
+- Keep a `CHANGELOG.md` file
+- Use semantic versioning
+- Group changes by type (Added, Changed, Fixed, Removed)
+- Include dates and version numbers
+
+### API Documentation
+- Document all public functions and classes
+- Include examples in docstrings
+- Use type hints consistently
+- Generate docs automatically from docstrings
