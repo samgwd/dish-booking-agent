@@ -9,23 +9,6 @@ from pydantic_ai.messages import ModelMessage, ModelResponse
 
 from src.agent import agent, process_message
 
-app = FastAPI()
-
-# uvicorn src.api:app --reload --port 8000
-
-message_histories: defaultdict[str, list[ModelMessage]] = defaultdict(list)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    """Check the health of the API.
-
-    Returns:
-        A tuple containing a dictionary with the status and an integer representing the HTTP status
-        code.
-    """
-    return {"status": "ok"}
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -42,6 +25,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+message_histories: defaultdict[str, list[ModelMessage]] = defaultdict(list)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Check the health of the API.
+
+    Returns:
+        A tuple containing a dictionary with the status and an integer representing the HTTP status
+        code.
+    """
+    return {"status": "ok"}
 
 
 @app.get("/send-message")

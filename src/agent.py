@@ -88,7 +88,8 @@ async def process_message(
                     print(text, end="", flush=True)
         if text_started:
             print()
-        return list(captured_messages)
+        new_messages = list(captured_messages)
+        return [*message_history, *new_messages]
     except Exception as e:
         print(f"Error: {e}")
         traceback.print_exc()
