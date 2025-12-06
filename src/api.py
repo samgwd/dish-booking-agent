@@ -51,11 +51,12 @@ async def send_message(message: str, session: str = "default") -> list[str]:
         A list of strings representing the response messages.
     """
     history = message_histories[session]
+    prior_length = len(history)
     updated_history = await process_message(message, history)
     message_histories[session] = updated_history
 
     response_messages: list[str] = []
-    for msg in updated_history:
+    for msg in updated_history[prior_length:]:
         if isinstance(msg, ModelResponse):
             parts = [getattr(part, "content", "") for part in msg.parts]
             response_messages.append("".join(parts))
