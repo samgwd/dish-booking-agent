@@ -5,14 +5,16 @@ import traceback
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp import ClientSession
-from mcp_formatting import describe_tool_call
-from mcp_loader import load_mcp_servers_with_env
 from pydantic_ai import Agent, capture_run_messages
 from pydantic_ai.messages import AgentStreamEvent, FunctionToolCallEvent, ModelMessage
 from pydantic_ai.tools import RunContext
+
+from src.mcp_formatting import describe_tool_call
+from src.mcp_loader import load_mcp_servers_with_env
 
 load_dotenv()
 
@@ -35,7 +37,9 @@ async def log_mcp_activity(
             print(f"\n[MCP] {message}", flush=True)
 
 
-mcp_toolsets = load_mcp_servers_with_env("mcp_config.json")
+project_root = Path(__file__).resolve().parent.parent
+config_path = project_root / "mcp_config.json"
+mcp_toolsets = load_mcp_servers_with_env(str(config_path))
 
 agent = Agent(
     "openai:gpt-5-nano",
@@ -84,7 +88,8 @@ async def process_message(
                     print(text, end="", flush=True)
         if text_started:
             print()
-        return list(captured_messages)
+        new_messages = list(captured_messages)
+        return [*message_history, *new_messages]
     except Exception as e:
         print(f"Error: {e}")
         traceback.print_exc()

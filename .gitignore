@@ -84,3 +84,4 @@ Thumbs.db
 # Logs
 *.log
 curl
+src/api_test.ipynb
