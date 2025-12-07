@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import ChatInput from "@/components/ChatInput";
 import Message, { type MessageProps } from "@/components/Message";
+
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/backend";
+const storageKey = "chatMessages";
+const signatureOf = (message: MessageProps): string =>
+    `${message.author}|${message.isUser ? "user" : "assistant"}|${message.content}`;
 
 const userAvatar =
     "https://lh3.googleusercontent.com/aida-public/AB6AXuDjK9X3BZOWoc9jiC5v0rOYSnRJdYSxF53hzeB9iyHyFxtdeoKH-9f81MD9GKb5MCwlx14xjpOOdJkv5zYwW8jipICJ2s9GzLA9BZCQFJFymZoDsNTgRrH5fEu4U1l3vxB7E2ehg0pLfA4iymFOLLPvotA331oedtMqsXJ5QnFG8OzxTWl5wabg6T3g7Ke2RmSQgbFViXTQBbCqWQhzZRb4l2pRJhA3jM0wn7puCca_HktpdYFcv0r9RUYpuh9NLBQ1ufxZhrhE9Eo";
@@ -13,30 +17,102 @@ const assistantAvatar =
 
 export default function MessagePage(): JSX.Element {
     const [messages, setMessages] = useState<MessageProps[]>([]);
-    const processedInitialMessage = useRef<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [isSending, setIsSending] = useState<boolean>(false);
+    const processedInitialMessage = useRef<boolean>(false);
+    const sessionIdRef = useRef<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
 
-    const addConversationTurn = useCallback((content: string) => {
-        const timeStamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const ensureSessionId = useCallback((): string => {
+        if (sessionIdRef.current) return sessionIdRef.current;
 
-        setMessages((prev) => [
-            ...prev,
-            {
+        const createdId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `session-${Date.now()}`;
+
+        sessionIdRef.current = createdId;
+        try {
+            sessionStorage.setItem("chatSessionId", createdId);
+        } catch {
+            // Session storage may be unavailable in some environments.
+        }
+
+        return createdId;
+    }, []);
+
+    useEffect(() => {
+        if (sessionIdRef.current) return;
+        try {
+            const storedId = sessionStorage.getItem("chatSessionId");
+            if (storedId) {
+                sessionIdRef.current = storedId;
+                return;
+            }
+        } catch {
+            // Continue with a generated session id if storage fails.
+        }
+        ensureSessionId();
+    }, [ensureSessionId]);
+
+    const handleSend = useCallback(
+        async (content: string) => {
+            setError(null);
+
+            const timeStamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            const userMessage: MessageProps = {
                 author: "You",
                 time: timeStamp,
                 content,
                 isUser: true,
                 avatarUrl: userAvatar
-            },
-            {
-                author: "AI Assistant",
-                time: timeStamp,
-                content: `Thanks for your booking request: “${content}”. I’ll find the best option and confirm back.`,
-                isUser: false,
-                avatarUrl: assistantAvatar
+            };
+
+            setMessages((prev) => [...prev, userMessage]);
+            setIsSending(true);
+
+            try {
+                const sessionId = ensureSessionId();
+                const url = `${apiBase}/send-message?${new URLSearchParams({
+                    message: content,
+                    session: sessionId
+                }).toString()}`;
+
+                const response = await fetch(url, { method: "GET" });
+
+                if (!response.ok) {
+                    throw new Error(`Request failed with status ${response.status}`);
+                }
+
+                const payload = await response.json();
+                if (!Array.isArray(payload)) {
+                    throw new Error("Unexpected response shape");
+                }
+
+                const replyTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                setMessages((prev) => {
+                    const existing = new Set(prev.map(signatureOf));
+                    const nextMessages = payload
+                        .map((text) => ({
+                            author: "AI Assistant",
+                            time: replyTime,
+                            content: text,
+                            isUser: false,
+                            avatarUrl: assistantAvatar
+                        }))
+                        .filter((message) => !existing.has(signatureOf(message)));
+                    return [...prev, ...nextMessages];
+                });
+            } catch (fetchError) {
+                console.error(fetchError);
+                setError("Unable to reach the booking service. Please try again.");
+            } finally {
+                setIsSending(false);
             }
-        ]);
-    }, []);
+        },
+        [ensureSessionId]
+    );
 
     useEffect(() => {
         document.documentElement.classList.add("dark");
@@ -49,24 +125,49 @@ export default function MessagePage(): JSX.Element {
 
     useEffect(() => {
         try {
-            const incomingMessage = sessionStorage.getItem("initialMessage");
-            if (!incomingMessage || processedInitialMessage.current === incomingMessage) return;
+            const storedMessages = sessionStorage.getItem(storageKey);
+            if (storedMessages) {
+                setMessages(JSON.parse(storedMessages));
+            }
+        } catch {
+            // If storage is unavailable, continue without restoring state.
+        }
+    }, []);
 
-            processedInitialMessage.current = incomingMessage;
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(storageKey, JSON.stringify(messages));
+        } catch {
+            // Session storage may be unavailable; safe to ignore.
+        }
+    }, [messages]);
+
+    useEffect(() => {
+        if (processedInitialMessage.current) return;
+
+        try {
+            const incomingMessage = sessionStorage.getItem("initialMessage");
+            if (!incomingMessage) return;
+
+            processedInitialMessage.current = true;
             sessionStorage.removeItem("initialMessage");
-            addConversationTurn(incomingMessage);
+            void handleSend(incomingMessage);
         } catch {
             // If storage is unavailable, simply render without a pre-seeded message.
         }
-    }, [addConversationTurn]);
-
-    const handleSend = (content: string): void => {
-        addConversationTurn(content);
-    };
+    }, [handleSend]);
 
     const handleReset = (): void => {
         setMessages([]);
-        processedInitialMessage.current = null;
+        processedInitialMessage.current = false;
+        try {
+            sessionStorage.removeItem(storageKey);
+            sessionStorage.removeItem("chatSessionId");
+        } catch {
+            // Session storage may be unavailable; safe to ignore.
+        }
+        sessionIdRef.current = null;
+        ensureSessionId();
     };
 
     useEffect(() => {
@@ -76,7 +177,12 @@ export default function MessagePage(): JSX.Element {
     return (
         <div className="relative flex h-screen w-full flex-row overflow-hidden">
             <main className="flex h-full flex-1 flex-col">
-                <div className="absolute right-6 top-4 z-10">
+                <div className="absolute right-6 top-4 z-10 flex flex-col gap-3 items-end">
+                    {error && (
+                        <div className="rounded-lg bg-red-900/40 border border-red-500/40 px-3 py-2 text-sm text-red-100 max-w-xs">
+                            {error}
+                        </div>
+                    )}
                     <button
                         type="button"
                         onClick={handleReset}
