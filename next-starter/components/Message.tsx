@@ -1,14 +1,29 @@
 "use client";
 
-export default function Message({ author, time, content, isUser, avatarUrl }) {
-  const user = {
+export type MessageProps = {
+  author: string;
+  time: string;
+  content: string;
+  isUser: boolean;
+  avatarUrl: string;
+};
+
+type MessageStyles = {
+  container: string;
+  wrapper: string;
+  meta: string;
+  bubble: string;
+};
+
+export default function Message({ author, time, content, isUser, avatarUrl }: MessageProps): JSX.Element {
+  const user: MessageStyles = {
     container: "flex gap-4 justify-end",
     wrapper: "flex flex-1 flex-col items-end gap-2",
     meta: "text-white text-base font-semibold leading-tight",
     bubble: "bg-primary p-4 rounded-xl rounded-br-none"
   };
 
-  const assistant = {
+  const assistant: MessageStyles = {
     container: "flex gap-4",
     wrapper: "flex flex-1 flex-col items-start gap-2",
     meta: "text-white text-base font-semibold leading-tight",

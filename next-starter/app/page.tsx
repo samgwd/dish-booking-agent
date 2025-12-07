@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import ChatInput from "@/components/ChatInput";
-import Message from "@/components/Message";
+import Message, { type MessageProps } from "@/components/Message";
 
-const messages = [
+const messages: MessageProps[] = [
     {
         author: "AI Assistant",
         time: "10:30 AM",
@@ -25,7 +25,7 @@ const messages = [
     }
 ];
 
-export default function HomePage() {
+export default function HomePage(): JSX.Element {
     useEffect(() => {
         document.documentElement.classList.add("dark");
         document.body.classList.add("chat-page-body", "font-display");

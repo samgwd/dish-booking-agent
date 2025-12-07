@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { type ChangeEvent, type FormEvent, useState } from "react";
 
-const presets = ["Draft an email", "Translate text", "Debug this code"];
+const presets: readonly string[] = ["Draft an email", "Translate text", "Debug this code"];
 
-export default function ChatInput() {
-  const [inputValue, setInputValue] = useState("");
+export default function ChatInput(): JSX.Element {
+  const [inputValue, setInputValue] = useState<string>("");
 
-  const handleSubmit = (event) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     // Replace with real handler
     console.log("Sending:", inputValue);
     setInputValue("");
+  };
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setInputValue(event.target.value);
   };
 
   return (
@@ -36,7 +40,7 @@ export default function ChatInput() {
                 className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-white focus:outline-0 focus:ring-2 focus:ring-primary border-none bg-transparent focus:border-none h-full placeholder:text-[#9da6b9] px-4 text-base font-normal leading-normal"
                 placeholder="Ask me anything..."
                 value={inputValue}
-                onChange={(event) => setInputValue(event.target.value)}
+                onChange={handleChange}
               />
               <div className="flex border-none items-center justify-center pr-2">
                 <div className="flex items-center gap-1 justify-end">
