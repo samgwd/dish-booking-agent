@@ -1,62 +1,111 @@
 "use client";
 
-import { useEffect } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import ChatInput from "@/components/ChatInput";
-import Message, { type MessageProps } from "@/components/Message";
+import { useRouter } from "next/navigation";
+import "./booking/booking.css";
 
-const messages: MessageProps[] = [
-    {
-        author: "AI Assistant",
-        time: "10:30 AM",
-        content:
-            "Hello! How can I help you today? You can ask me to draft an email, translate text, or even debug some code.",
-        isUser: false,
-        avatarUrl:
-            "https://lh3.googleusercontent.com/aida-public/AB6AXuA1ORR1W1DJE0Mb41HZ2PPHaBJZsPGwKvhCmpWozZrvjBKIx_pfSQtlelyJFaiqAb_0HehE39oTKpqwGlLM2jICKKaCCd1g_qrYKdNCMROEz9rSEl8ofNfoRxf5m7T3DI1-QXhVM7OCeS9uVkBBnOPDftNwfSftgjab9el9n3G_QMojwKzEIsmOoTAoSgWuUTJkvJr5CuQbY6dM5IJvk2fFl04Wy_sNbktQR-8q7-sQFfQ4gpCW6BbWAXsxb22-dSoeXnbB9i3a9Ks"
-    },
-    {
-        author: "You",
-        time: "10:31 AM",
-        content: "Draft an email to my team about the new project timeline.",
-        isUser: true,
-        avatarUrl:
-            "https://lh3.googleusercontent.com/aida-public/AB6AXuDjK9X3BZOWoc9jiC5v0rOYSnRJdYSxF53hzeB9iyHyFxtdeoKH-9f81MD9GKb5MCwlx14xjpOOdJkv5zYwW8jipICJ2s9GzLA9BZCQFJFymZoDsNTgRrH5fEu4U1l3vxB7E2ehg0pLfA4iymFOLLPvotA331oedtMqsXJ5QnFG8OzxTWl5wabg6T3g7Ke2RmSQgbFViXTQBbCqWQhzZRb4l2pRJhA3jM0wn7puCca_HktpdYFcv0r9RUYpuh9NLBQ1ufxZhrhE9Eo"
-    }
-];
+export default function BookingLandingPage(): JSX.Element {
+    const [inputValue, setInputValue] = useState<string>("");
+    const router = useRouter();
 
-export default function HomePage(): JSX.Element {
     useEffect(() => {
-        document.documentElement.classList.add("dark");
-        document.body.classList.add("chat-page-body", "font-display");
+        document.body.classList.add("room-booking-agent-body", "text-white", "font-display");
         return () => {
-            document.documentElement.classList.remove("dark");
-            document.body.classList.remove("chat-page-body", "font-display");
+            document.body.classList.remove("room-booking-agent-body", "text-white", "font-display");
         };
     }, []);
 
+    const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        const trimmed = inputValue.trim();
+        if (trimmed.length === 0) return;
+
+        try {
+            sessionStorage.setItem("initialMessage", trimmed);
+        } catch {
+            // If storage is unavailable, still navigate to messages without the URL param.
+        }
+
+        router.push("/messages");
+        setInputValue("");
+    };
+
+    const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
+        setInputValue(event.target.value);
+    };
+
     return (
-        <div className="relative flex h-screen w-full flex-row overflow-hidden">
-            <main className="flex h-full flex-1 flex-col">
-                <div className="flex flex-1 flex-col overflow-y-auto p-6 md:p-10">
-                    <div className="flex max-w-4xl mx-auto w-full flex-1 flex-col justify-end">
-                        <div className="space-y-8">
-                            {messages.map((message, index) => (
-                                <Message key={index} {...message} />
-                            ))}
+        <main className="relative flex flex-col items-center justify-center p-4 min-h-screen w-full">
+            <div className="floating-icon-left absolute top-0 -left-12 sm:-left-16 w-10 h-10 bg-gray-800/50 rounded-lg shadow-lg flex items-center justify-center">
+                <svg
+                    className="h-6 w-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+
+            <div className="floating-icon-right absolute top-2 -right-10 sm:-right-14 w-10 h-10 bg-gray-800/50 rounded-lg shadow-lg flex items-center justify-center">
+                <svg
+                    className="h-6 w-6 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+
+            <header className="text-center mb-8">
+                <h1 className="text-4xl md:text-5xl font-bold text-white tracking-wide">Room Booking Agent</h1>
+                <p className="text-gray-400 mt-2 text-lg">Welcome! How can I assist you with your booking today?</p>
+            </header>
+
+            <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+                <div className="relative">
+                    <div className="glow-shadow rounded-2xl bg-slate-900/40 p-1.5 backdrop-blur-sm border border-blue-500/20">
+                        <div className="relative flex items-center">
+                            <input
+                                aria-label="Booking query input"
+                                className="w-full bg-transparent text-gray-200 placeholder-gray-500 border-none focus:ring-0 pl-4 pr-12 py-3 text-base"
+                                id="booking_query"
+                                name="booking_query"
+                                placeholder="e.g., Book a conference room for tomorrow at 10 AM"
+                                type="text"
+                                value={inputValue}
+                                onChange={handleChange}
+                            />
+                            <button
+                                aria-label="Submit booking query"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-700/60 hover:bg-slate-600/80 p-2 rounded-lg transition-colors duration-200"
+                                type="submit"
+                            >
+                                <svg
+                                    className="w-5 h-5 text-gray-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                >
+                                    <path d="M22 2 11 13" />
+                                    <path d="m22 2-7 20-4-9-9-4 20-7z" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
-                <ChatInput />
-                <div className="absolute top-4 right-4">
-                    <Link
-                        href="/booking"
-                        className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
-                    >
-                        Go to Booking Agent
-                    </Link>
-                </div>
-            </main>
-        </div>
+            </form>
+
+        </main>
     );
 }

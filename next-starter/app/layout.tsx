@@ -17,7 +17,9 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
     return (
         <html lang="en">
-            <body className={`${inter.className} bg-background-light text-slate-900 font-display`}>{children}</body>
+            <body className={`${inter.className} bg-background-light text-slate-900 font-display`}>
+                {children}
+            </body>
         </html>
     );
 }

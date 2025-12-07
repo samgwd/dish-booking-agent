@@ -2,16 +2,33 @@
 
 import { type ChangeEvent, type FormEvent, useState } from "react";
 
+type ChatInputProps = {
+  onSend?: (message: string) => Promise<void> | void;
+};
+
 const presets: readonly string[] = ["Draft an email", "Translate text", "Debug this code"];
 
-export default function ChatInput(): JSX.Element {
+export default function ChatInput({ onSend }: ChatInputProps): JSX.Element {
   const [inputValue, setInputValue] = useState<string>("");
+  const [isSending, setIsSending] = useState<boolean>(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    // Replace with real handler
-    console.log("Sending:", inputValue);
-    setInputValue("");
+    const trimmed = inputValue.trim();
+    if (trimmed.length === 0) return;
+
+    if (!onSend) {
+      setInputValue("");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await onSend(trimmed);
+      setInputValue("");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -27,6 +44,7 @@ export default function ChatInput(): JSX.Element {
               key={text}
               type="button"
               className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-lg bg-[#282e39] px-4 text-white hover:bg-primary/80 transition-colors"
+              onClick={() => setInputValue(text)}
             >
               <p className="text-sm font-medium leading-normal">{text}</p>
             </button>
@@ -81,7 +99,9 @@ export default function ChatInput(): JSX.Element {
                   </button>
                   <button
                     type="submit"
-                    className="flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/80 transition-colors"
+                    className="flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={isSending || inputValue.trim().length === 0}
+                    aria-busy={isSending}
                   >
                     <span className="truncate">Send</span>
                   </button>
