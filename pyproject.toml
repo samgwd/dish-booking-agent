@@ -84,7 +84,7 @@ max-complexity = 5
 
 # typos configuration
 [tool.typos.files]
-extend-exclude = [".gitignore", "LICENSE", ".*"]
+extend-exclude = [".gitignore", "LICENSE", ".*", "next-starter/**", "frontend/**"]
 
 [tool.typos.default.extend-words]
 center = "center"

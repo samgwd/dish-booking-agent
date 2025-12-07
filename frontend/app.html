@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Prototype</title>
+
+    <!-- Tailwind CSS and Fonts -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings:
+                'FILL' 0,
+                'wght' 400,
+                'GRAD' 0,
+                'opsz' 24
+        }
+
+        /* Styles for Room Booking Agent Page */
+        .room-booking-agent-body {
+            background-color: #0d101b;
+            background-image:
+                radial-gradient(ellipse 60% 40% at 20% 30%, rgba(58, 111, 247, 0.15), transparent),
+                radial-gradient(ellipse 60% 40% at 80% 70%, rgba(131, 85, 226, 0.15), transparent),
+                radial-gradient(ellipse 40% 40% at 50% 50%, rgba(25, 25, 112, 0.05), transparent);
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glow-shadow {
+            box-shadow: 0 0 10px 3px rgba(50, 150, 255, 0.4);
+        }
+
+        /* Styles for Chat Page */
+        .chat-page-body {
+            background-color: #f6f6f8;
+            /* background-light */
+        }
+
+        .dark .chat-page-body {
+            background-color: #101622;
+            /* background-dark */
+        }
+    </style>
+    <script>
+        // Tailwind config for AI Chat Page
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate } = ReactRouterDOM;
+
+        // --- COMPONENTS ---
+
+        const Message = ({ author, time, content, isUser, avatarUrl }) => {
+            const userStyles = {
+                container: "flex gap-4 justify-end",
+                contentWrapper: "flex flex-1 flex-col items-end gap-2",
+                authorTime: "text-white text-base font-bold leading-tight",
+                bubble: "bg-primary p-4 rounded-xl rounded-br-none",
+                avatarOrder: "order-2"
+            };
+
+            const assistantStyles = {
+                container: "flex gap-4",
+                contentWrapper: "flex flex-1 flex-col items-start gap-2",
+                authorTime: "text-white text-base font-bold leading-tight",
+                bubble: "bg-slate-800 p-4 rounded-xl rounded-tl-none",
+                avatarOrder: "order-1"
+            };
+
+            const styles = isUser ? userStyles : assistantStyles;
+
+            return (
+                <div className={styles.container}>
+                    {isUser && (
+                        <div className="flex flex-1 flex-col items-end gap-2">
+                            <div className="flex flex-col gap-1 w-full max-w-2xl items-end">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    <p className={styles.authorTime}>{author}</p>
+                                    <p className="text-slate-400 text-sm font-normal leading-normal">{time}</p>
+                                </div>
+                                <div className={styles.bubble}>
+                                    <p className="text-white text-base font-normal leading-relaxed">{content}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <div
+                        className={`bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 flex-shrink-0`}
+                        style={{ backgroundImage: `url("${avatarUrl}")` }}
+                        data-alt={`${author} avatar`}
+                    ></div>
+                    {!isUser && (
+                        <div className="flex flex-1 flex-col items-start gap-2">
+                            <div className="flex flex-col gap-1 w-full max-w-2xl">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    <p className={styles.authorTime}>{author}</p>
+                                    <p className="text-slate-400 text-sm font-normal leading-normal">{time}</p>
+                                </div>
+                                <div className={styles.bubble}>
+                                    <p className="text-white text-base font-normal leading-relaxed">{content}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ChatInput = () => {
+            const [inputValue, setInputValue] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                // Mock submission, clear input
+                console.log("Sending:", inputValue);
+                setInputValue('');
+            };
+
+            return (
+                <div className="w-full bg-background-light dark:bg-background-dark p-6 md:p-10 pt-4 md:pt-6">
+                    <div className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-4">
+                        <div className="flex gap-3 flex-wrap">
+                            <button className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-lg bg-[#282e39] px-4 text-white hover:bg-primary/80 transition-colors">
+                                <p className="text-sm font-medium leading-normal">Draft an email</p>
+                            </button>
+                            <button className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-lg bg-[#282e39] px-4 text-white hover:bg-primary/80 transition-colors">
+                                <p className="text-sm font-medium leading-normal">Translate text</p>
+                            </button>
+                            <button className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-x-2 rounded-lg bg-[#282e39] px-4 text-white hover:bg-primary/80 transition-colors">
+                                <p className="text-sm font-medium leading-normal">Debug this code</p>
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="flex items-center gap-4 @container">
+                            <label className="flex flex-col min-w-40 h-14 flex-1">
+                                <div className="flex w-full flex-1 items-stretch rounded-xl h-full bg-[#282e39]">
+                                    <input
+                                        className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-white focus:outline-0 focus:ring-2 focus:ring-primary border-none bg-transparent focus:border-none h-full placeholder:text-[#9da6b9] px-4 text-base font-normal leading-normal"
+                                        placeholder="Ask me anything..."
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                    />
+                                    <div className="flex border-none items-center justify-center pr-2">
+                                        <div className="flex items-center gap-1 justify-end">
+                                            <button type="button" className="flex items-center justify-center p-2 rounded-full text-[#9da6b9] hover:bg-primary/20 hover:text-white transition-colors">
+                                                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>attach_file</span>
+                                            </button>
+                                            <button type="button" className="flex items-center justify-center p-2 rounded-full text-[#9da6b9] hover:bg-primary/20 hover:text-white transition-colors">
+                                                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>mic</span>
+                                            </button>
+                                            <button type="submit" className="flex cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/80 transition-colors">
+                                                <span className="truncate">Send</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </label>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- SCREENS / PAGES ---
+
+        const AIChatPage = () => {
+            useEffect(() => {
+                document.documentElement.classList.add('dark');
+                document.body.classList.add('chat-page-body', 'font-display');
+                return () => {
+                    document.documentElement.classList.remove('dark');
+                    document.body.classList.remove('chat-page-body', 'font-display');
+                };
+            }, []);
+
+            const messages = [
+                {
+                    author: "AI Assistant",
+                    time: "10:30 AM",
+                    content: "Hello! How can I help you today? You can ask me to draft an email, translate text, or even debug some code.",
+                    isUser: false,
+                    avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuA1ORR1W1DJE0Mb41HZ2PPHaBJZsPGwKvhCmpWozZrvjBKIx_pfSQtlelyJFaiqAb_0HehE39oTKpqwGlLM2jICKKaCCd1g_qrYKdNCMROEz9rSEl8ofNfoRxf5m7T3DI1-QXhVM7OCeS9uVkBBnOPDftNwfSftgjab9el9n3G_QMojwKzEIsmOoTAoSgWuUTJkvJr5CuQbY6dM5IJvk2fFl04Wy_sNbktQR-8q7-sQFfQ4gpCW6BbWAXsxb22-dSoeXnbB9i3a9Ks"
+                },
+                {
+                    author: "You",
+                    time: "10:31 AM",
+                    content: "Draft an email to my team about the new project timeline.",
+                    isUser: true,
+                    avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDjK9X3BZOWoc9jiC5v0rOYSnRJdYSxF53hzeB9iyHyFxtdeoKH-9f81MD9GKb5MCwlx14xjpOOdJkv5zYwW8jipICJ2s9GzLA9BZCQFJFymZoDsNTgRrH5fEu4U1l3vxB7E2ehg0pLfA4iymFOLLPvotA331oedtMqsXJ5QnFG8OzxTWl5wabg6T3g7Ke2RmSQgbFViXTQBbCqWQhzZRb4l2pRJhA3jM0wn7puCca_HktpdYFcv0r9RUYpuh9NLBQ1ufxZhrhE9Eo"
+                }
+            ];
+
+            return (
+                <div className="relative flex h-screen w-full flex-row overflow-hidden">
+                    <main className="flex h-full flex-1 flex-col">
+                        <div className="flex flex-1 flex-col overflow-y-auto p-6 md:p-10">
+                            <div className="flex max-w-4xl mx-auto w-full flex-1 flex-col justify-end">
+                                <div className="space-y-8">
+                                    {messages.map((msg, index) => <Message key={index} {...msg} />)}
+                                </div>
+                            </div>
+                        </div>
+                        <ChatInput />
+                        <div className="absolute top-4 right-4">
+                            <Link to="/booking" className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors">Go to Booking Agent</Link>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const RoomBookingPage = () => {
+            useEffect(() => {
+                document.body.classList.add('room-booking-agent-body', 'text-white');
+                return () => {
+                    document.body.classList.remove('room-booking-agent-body', 'text-white');
+                };
+            }, []);
+
+            const [inputValue, setInputValue] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                console.log("Booking query:", inputValue);
+                setInputValue('');
+            };
+
+            return (
+                <main className="relative flex flex-col items-center justify-center p-4 min-h-screen w-full">
+                    {/* FloatingIcons */}
+                    <div className="absolute top-0 -left-12 sm:-left-16 w-10 h-10 bg-gray-800/50 rounded-lg shadow-lg flex items-center justify-center" style={{ transform: 'rotate(-15deg)' }}>
+                        <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" strokeLinecap="round" strokeLinejoin="round"></path>
+                        </svg>
+                    </div>
+                    <div className="absolute top-2 -right-10 sm:-right-14 w-10 h-10 bg-gray-800/50 rounded-lg shadow-lg flex items-center justify-center" style={{ transform: 'rotate(15deg)' }}>
+                        <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round"></path>
+                        </svg>
+                    </div>
+
+                    <header className="text-center mb-8">
+                        <h1 className="text-4xl md:text-5xl font-bold text-white tracking-wide">
+                            Room Booking Agent
+                        </h1>
+                        <p className="text-gray-400 mt-2 text-lg">
+                            Welcome! How can I assist you with your booking today?
+                        </p>
+                    </header>
+
+                    <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+                        <div className="relative">
+                            <div className="glow-shadow rounded-2xl bg-slate-900/40 p-1.5 backdrop-blur-sm border border-blue-500/20">
+                                <div className="relative flex items-center">
+                                    <input
+                                        aria-label="Booking query input"
+                                        className="w-full bg-transparent text-gray-200 placeholder-gray-500 border-none focus:ring-0 pl-4 pr-12 py-3 text-base"
+                                        id="booking_query"
+                                        name="booking_query"
+                                        placeholder="e.g., Book a conference room for tomorrow at 10 AM"
+                                        type="text"
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                    />
+                                    <button aria-label="Submit booking query" className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-700/60 hover:bg-slate-600/80 p-2 rounded-lg transition-colors duration-200" type="submit">
+                                        <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M22 2 11 13"></path>
+                                            <path d="m22 2-7 20-4-9-9-4 20-7z"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <div className="absolute top-4 right-4">
+                        <Link to="/" className="bg-slate-700/60 text-white px-4 py-2 rounded-lg hover:bg-slate-600/80 transition-colors">Back to Chat</Link>
+                    </div>
+                </main>
+            );
+        };
+
+        // --- APP ---
+
+        const App = () => {
+            return (
+                <MemoryRouter>
+                    <Routes>
+                        <Route path="/" element={<AIChatPage />} />
+                        <Route path="/booking" element={<RoomBookingPage />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
