@@ -55,11 +55,16 @@ async def send_message(message: str, session: str = "default") -> list[str]:
     updated_history = await process_message(message, history)
     message_histories[session] = updated_history
 
-    # Collapse streamed assistant parts into a single reply so the UI renders one response per send.
-    response_parts: list[str] = []
-    for msg in updated_history[prior_length:]:
-        if isinstance(msg, ModelResponse):
-            response_parts.extend(getattr(part, "content", "") for part in msg.parts)
+    new_messages = updated_history[prior_length:]
+    latest_response = next(
+        (msg for msg in reversed(new_messages) if isinstance(msg, ModelResponse)),
+        None,
+    )
 
-    combined_response = "".join(response_parts).strip()
+    if not latest_response:
+        return []
+
+    combined_response = "".join(
+        getattr(part, "content", "") for part in latest_response.parts
+    ).strip()
     return [combined_response] if combined_response else []
