@@ -130,15 +130,6 @@ export default function MessagePage(): JSX.Element {
     }, []);
 
 
-    /** Persist message history to session storage whenever it changes. */
-    useEffect(() => {
-        try {
-            sessionStorage.setItem(storageKey, JSON.stringify(messages));
-        } catch {
-            // Session storage may be unavailable; safe to ignore.
-        }
-    }, [messages]);
-
     /** Send a pre-seeded initial message (if any) only once per session. */
     useEffect(() => {
         if (processedInitialMessage.current) return;
