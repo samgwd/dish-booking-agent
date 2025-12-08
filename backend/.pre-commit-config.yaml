@@ -22,34 +22,34 @@ repos:
     rev: 23.10.1
     hooks:
       - id: black
-        args: [--config=pyproject.toml]
+        args: [--config=backend/pyproject.toml]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     # Ruff version.
     rev: "v0.1.2"
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix, "--config=pyproject.toml"] # enable autofix
+        args: [--fix, --exit-non-zero-on-fix, "--config=backend/pyproject.toml"] # enable autofix
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.6.1
     hooks:
       - id: mypy
-        args: ["--config-file=pyproject.toml"]
+        args: ["--config-file=backend/pyproject.toml"]
         exclude: ^tests/
 
   - repo: https://github.com/crate-ci/typos
     rev: typos-dict-v0.11.2
     hooks:
       - id: typos
-        args: [--config=pyproject.toml]
+        args: [--config=backend/pyproject.toml]
         pass_filenames: false
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.8
     hooks:
       - id: bandit
-        args: ["--config=pyproject.toml"]
+        args: ["--config=backend/pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
 
   - repo: local
