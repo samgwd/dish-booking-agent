@@ -55,10 +55,16 @@ async def send_message(message: str, session: str = "default") -> list[str]:
     updated_history = await process_message(message, history)
     message_histories[session] = updated_history
 
-    response_messages: list[str] = []
-    for msg in updated_history[prior_length:]:
-        if isinstance(msg, ModelResponse):
-            parts = [getattr(part, "content", "") for part in msg.parts]
-            response_messages.append("".join(parts))
+    new_messages = updated_history[prior_length:]
+    latest_response = next(
+        (msg for msg in reversed(new_messages) if isinstance(msg, ModelResponse)),
+        None,
+    )
 
-    return response_messages
+    if not latest_response:
+        return []
+
+    combined_response = "".join(
+        getattr(part, "content", "") for part in latest_response.parts
+    ).strip()
+    return [combined_response] if combined_response else []
