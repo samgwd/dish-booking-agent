@@ -76,6 +76,7 @@ export default function MessagePage(): JSX.Element {
             setMessages((prev) => [...prev, userMessage]);
             setIsSending(true);
 
+
             try {
                 const sessionId = ensureSessionId();
                 const url = `${apiBase}/send-message?${new URLSearchParams({
@@ -97,7 +98,6 @@ export default function MessagePage(): JSX.Element {
                 const replyTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
                 setMessages((prev) => {
-                    const existing = new Set(prev.map(signatureOf));
                     const nextMessages = payload
                         .map((text) => ({
                             author: "AI Assistant",
@@ -106,7 +106,6 @@ export default function MessagePage(): JSX.Element {
                             isUser: false,
                             avatarUrl: assistantAvatar
                         }))
-                        .filter((message) => !existing.has(signatureOf(message)));
                     return [...prev, ...nextMessages];
                 });
             } catch (fetchError) {

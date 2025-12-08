@@ -23,9 +23,9 @@ export default function ChatInput({ onSend }: ChatInputProps): JSX.Element {
     }
 
     setIsSending(true);
+    setInputValue("");
     try {
       await onSend(trimmed);
-      setInputValue("");
     } finally {
       setIsSending(false);
     }
