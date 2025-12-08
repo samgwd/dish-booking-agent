@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatInput from "@/components/ChatInput";
 import Message, { type MessageProps } from "@/components/Message";
 
+/** Base URL for backend message API requests. */
 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/backend";
 const storageKey = "chatMessages";
 const signatureOf = (message: MessageProps): string =>
@@ -15,6 +16,7 @@ const userAvatar =
 const assistantAvatar =
     "https://lh3.googleusercontent.com/aida-public/AB6AXuA1ORR1W1DJE0Mb41HZ2PPHaBJZsPGwKvhCmpWozZrvjBKIx_pfSQtlelyJFaiqAb_0HehE39oTKpqwGlLM2jICKKaCCd1g_qrYKdNCMROEz9rSEl8ofNfoRxf5m7T3DI1-QXhVM7OCeS9uVkBBnOPDftNwfSftgjab9el9n3G_QMojwKzEIsmOoTAoSgWuUTJkvJr5CuQbY6dM5IJvk2fFl04Wy_sNbktQR-8q7-sQFfQ4gpCW6BbWAXsxb22-dSoeXnbB9i3a9Ks";
 
+/** Chat transcript page that renders messages, handles sending, and syncs state to storage. */
 export default function MessagePage(): JSX.Element {
     const [messages, setMessages] = useState<MessageProps[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export default function MessagePage(): JSX.Element {
     const sessionIdRef = useRef<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
 
+    /** Ensure a stable session id exists and store it for reuse. */
     const ensureSessionId = useCallback((): string => {
         if (sessionIdRef.current) return sessionIdRef.current;
 
@@ -41,6 +44,7 @@ export default function MessagePage(): JSX.Element {
         return createdId;
     }, []);
 
+    /** Restore an existing session id from storage or create one once on mount. */
     useEffect(() => {
         if (sessionIdRef.current) return;
         try {
@@ -55,6 +59,7 @@ export default function MessagePage(): JSX.Element {
         ensureSessionId();
     }, [ensureSessionId]);
 
+    /** Send a user message to the backend, append responses, and handle transient errors. */
     const handleSend = useCallback(
         async (content: string) => {
             setError(null);
@@ -114,6 +119,7 @@ export default function MessagePage(): JSX.Element {
         [ensureSessionId]
     );
 
+    /** Apply chat page theming on mount and tidy up on unmount. */
     useEffect(() => {
         document.documentElement.classList.add("dark");
         document.body.classList.add("chat-page-body", "font-display");
@@ -123,17 +129,8 @@ export default function MessagePage(): JSX.Element {
         };
     }, []);
 
-    useEffect(() => {
-        try {
-            const storedMessages = sessionStorage.getItem(storageKey);
-            if (storedMessages) {
-                setMessages(JSON.parse(storedMessages));
-            }
-        } catch {
-            // If storage is unavailable, continue without restoring state.
-        }
-    }, []);
 
+    /** Persist message history to session storage whenever it changes. */
     useEffect(() => {
         try {
             sessionStorage.setItem(storageKey, JSON.stringify(messages));
@@ -142,6 +139,7 @@ export default function MessagePage(): JSX.Element {
         }
     }, [messages]);
 
+    /** Send a pre-seeded initial message (if any) only once per session. */
     useEffect(() => {
         if (processedInitialMessage.current) return;
 
@@ -157,6 +155,7 @@ export default function MessagePage(): JSX.Element {
         }
     }, [handleSend]);
 
+    /** Reset conversation state and clear stored session data. */
     const handleReset = (): void => {
         setMessages([]);
         processedInitialMessage.current = false;
@@ -170,6 +169,7 @@ export default function MessagePage(): JSX.Element {
         ensureSessionId();
     };
 
+    /** Keep the latest message in view whenever messages change. */
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);

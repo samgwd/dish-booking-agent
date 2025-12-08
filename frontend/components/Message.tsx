@@ -42,7 +42,9 @@ export default function Message({ author, time, content, isUser, avatarUrl }: Me
               <p className="text-slate-400 text-sm font-normal leading-normal">{time}</p>
             </div>
             <div className={styles.bubble}>
-              <p className="text-white text-base font-normal leading-relaxed">{content}</p>
+              <p className="text-white text-base font-normal leading-relaxed whitespace-pre-wrap break-words">
+                {content}
+              </p>
             </div>
           </div>
         </div>
@@ -62,7 +64,9 @@ export default function Message({ author, time, content, isUser, avatarUrl }: Me
               <p className="text-slate-400 text-sm font-normal leading-normal">{time}</p>
             </div>
             <div className={styles.bubble}>
-              <p className="text-white text-base font-normal leading-relaxed">{content}</p>
+              <p className="text-white text-base font-normal leading-relaxed whitespace-pre-wrap break-words">
+                {content}
+              </p>
             </div>
           </div>
         </div>
