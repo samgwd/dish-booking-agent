@@ -4,10 +4,31 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage, ModelResponse
 
 from src.agent import agent, process_message
+from src.user_db.user_db_utilities import (
+    authenticate,
+    create_user,
+    delete_user,
+    get_user_by_id,
+    logout_user,
+)
+
+
+class UserCredentials(BaseModel):
+    """Request body for user authentication endpoints."""
+
+    email: str
+    password: str
+
+
+class UserIdRequest(BaseModel):
+    """Request body for endpoints requiring a user ID."""
+
+    user_id: str
 
 
 @asynccontextmanager
@@ -36,6 +57,67 @@ def health() -> dict[str, str]:
         A tuple containing a dictionary with the status and an integer representing the HTTP status
         code.
     """
+    return {"status": "ok"}
+
+
+@app.post("/register")
+async def register(credentials: UserCredentials) -> dict[str, str]:
+    """Register a new user.
+
+    Args:
+        credentials: The user credentials containing email and password.
+    """
+    user = create_user(credentials.email, credentials.password)
+    return {"status": "ok", "user_id": str(user.id)}
+
+
+@app.post("/login")
+async def login(credentials: UserCredentials) -> dict[str, str]:
+    """Login a user.
+
+    Args:
+        credentials: The user credentials containing email and password.
+
+    Raises:
+        HTTPException: If the credentials are invalid.
+    """
+    user = authenticate(credentials.email, credentials.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"status": "ok", "user_id": str(user.id)}
+
+
+@app.post("/logout")
+async def logout(request: UserIdRequest) -> dict[str, str]:
+    """Logout a user.
+
+    Args:
+        request: The request containing the user ID to logout.
+
+    Raises:
+        HTTPException: If the user is not found.
+    """
+    user = get_user_by_id(request.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    logout_user(user)
+    return {"status": "ok"}
+
+
+@app.post("/delete-user")
+async def delete_user_account(request: UserIdRequest) -> dict[str, str]:
+    """Delete a user.
+
+    Args:
+        request: The request containing the user ID to delete.
+
+    Raises:
+        HTTPException: If the user is not found.
+    """
+    user = get_user_by_id(request.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    delete_user(user)
     return {"status": "ok"}
 
 

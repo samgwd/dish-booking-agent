@@ -14,7 +14,9 @@ if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set")
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# Keep instances usable after commit/close for simple read paths (e.g. notebooks).
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
