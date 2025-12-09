@@ -13,6 +13,8 @@ dependencies = [
     "fastapi>=0.124.0",
     "sqlalchemy>=2.0.0",
     "psycopg2-binary>=2.9.0",
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
 ]
 
 # mypy configuration

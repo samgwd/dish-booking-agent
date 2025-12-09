@@ -1,5 +1,6 @@
 """Create all tables in the database."""
 
+from . import models  # noqa: F401 ensures models load so metadata has tables
 from .user_db import Base, engine
 
 
