@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -14,7 +15,6 @@ from src.user_db.user_db_utilities import (
     authenticate,
     create_user,
     delete_user,
-    get_user_by_id,
     logout_user,
 )
 
@@ -29,7 +29,7 @@ class UserCredentials(BaseModel):
 class UserIdRequest(BaseModel):
     """Request body for endpoints requiring a user ID."""
 
-    user_id: str
+    user_id: UUID
 
 
 @asynccontextmanager
@@ -106,10 +106,8 @@ async def logout(request: UserIdRequest) -> dict[str, str]:
     Raises:
         HTTPException: If the user is not found.
     """
-    user = get_user_by_id(request.user_id)
-    if user is None:
+    if not logout_user(request.user_id):
         raise HTTPException(status_code=404, detail="User not found")
-    logout_user(user)
     return {"status": "ok"}
 
 
@@ -123,10 +121,8 @@ async def delete_user_account(request: UserIdRequest) -> dict[str, str]:
     Raises:
         HTTPException: If the user is not found.
     """
-    user = get_user_by_id(request.user_id)
-    if user is None:
+    if not delete_user(request.user_id):
         raise HTTPException(status_code=404, detail="User not found")
-    delete_user(user)
     return {"status": "ok"}
 
 
