@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import AuthControls from "@/components/AuthControls";
 import ChatInput from "@/components/ChatInput";
 import Message, { type MessageProps } from "@/components/Message";
-
-/** Base URL for backend message API requests. */
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/backend";
+import { apiBase } from "@/lib/apiBase";
+import { getStoredAuth } from "@/lib/authStorage";
 const storageKey = "chatMessages";
 const signatureOf = (message: MessageProps): string =>
     `${message.author}|${message.isUser ? "user" : "assistant"}|${message.content}`;
@@ -18,12 +19,23 @@ const assistantAvatar =
 
 /** Chat transcript page that renders messages, handles sending, and syncs state to storage. */
 export default function MessagePage(): JSX.Element {
+    const router = useRouter();
+    const [isReady, setIsReady] = useState(false);
     const [messages, setMessages] = useState<MessageProps[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState<boolean>(false);
     const processedInitialMessage = useRef<boolean>(false);
     const sessionIdRef = useRef<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const stored = getStoredAuth();
+        if (!stored.userId) {
+            router.replace("/auth");
+            return;
+        }
+        setIsReady(true);
+    }, [router]);
 
     /** Ensure a stable session id exists and store it for reuse. */
     const ensureSessionId = useCallback((): string => {
@@ -46,7 +58,7 @@ export default function MessagePage(): JSX.Element {
 
     /** Restore an existing session id from storage or create one once on mount. */
     useEffect(() => {
-        if (sessionIdRef.current) return;
+        if (!isReady || sessionIdRef.current) return;
         try {
             const storedId = sessionStorage.getItem("chatSessionId");
             if (storedId) {
@@ -57,7 +69,7 @@ export default function MessagePage(): JSX.Element {
             // Continue with a generated session id if storage fails.
         }
         ensureSessionId();
-    }, [ensureSessionId]);
+    }, [ensureSessionId, isReady]);
 
     /** Send a user message to the backend, append responses, and handle transient errors. */
     const handleSend = useCallback(
@@ -120,18 +132,19 @@ export default function MessagePage(): JSX.Element {
 
     /** Apply chat page theming on mount and tidy up on unmount. */
     useEffect(() => {
+        if (!isReady) return;
         document.documentElement.classList.add("dark");
         document.body.classList.add("chat-page-body", "font-display");
         return () => {
             document.documentElement.classList.remove("dark");
             document.body.classList.remove("chat-page-body", "font-display");
         };
-    }, []);
+    }, [isReady]);
 
 
     /** Send a pre-seeded initial message (if any) only once per session. */
     useEffect(() => {
-        if (processedInitialMessage.current) return;
+        if (!isReady || processedInitialMessage.current) return;
 
         try {
             const incomingMessage = sessionStorage.getItem("initialMessage");
@@ -143,7 +156,7 @@ export default function MessagePage(): JSX.Element {
         } catch {
             // If storage is unavailable, simply render without a pre-seeded message.
         }
-    }, [handleSend]);
+    }, [handleSend, isReady]);
 
     /** Reset conversation state and clear stored session data. */
     const handleReset = (): void => {
@@ -161,13 +174,19 @@ export default function MessagePage(): JSX.Element {
 
     /** Keep the latest message in view whenever messages change. */
     useEffect(() => {
+        if (!isReady) return;
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    }, [messages, isReady]);
+
+    if (!isReady) {
+        return null;
+    }
 
     return (
         <div className="relative flex h-screen w-full flex-row overflow-hidden">
             <main className="flex h-full flex-1 flex-col">
                 <div className="absolute right-6 top-4 z-10 flex flex-col gap-3 items-end">
+                    <AuthControls />
                     {error && (
                         <div className="rounded-lg bg-red-900/40 border border-red-500/40 px-3 py-2 text-sm text-red-100 max-w-xs">
                             {error}

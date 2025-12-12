@@ -1,13 +1,24 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import AuthControls from "@/components/AuthControls";
+import { getStoredAuth } from "@/lib/authStorage";
 import "./booking/booking.css";
 
 export default function BookingLandingPage(): JSX.Element {
     const [inputValue, setInputValue] = useState<string>("");
+    const [isReady, setIsReady] = useState<boolean>(false);
     const router = useRouter();
+
+    useEffect(() => {
+        const { userId } = getStoredAuth();
+        if (!userId) {
+            router.replace("/auth");
+            return;
+        }
+        setIsReady(true);
+    }, [router]);
 
     useEffect(() => {
         document.body.classList.add("room-booking-agent-body", "text-white", "font-display");
@@ -35,8 +46,15 @@ export default function BookingLandingPage(): JSX.Element {
         setInputValue(event.target.value);
     };
 
+    if (!isReady) {
+        return null;
+    }
+
     return (
         <main className="relative flex flex-col items-center justify-center p-4 min-h-screen w-full">
+            <div className="absolute top-4 right-4">
+                <AuthControls />
+            </div>
             <div className="floating-icon-left absolute top-0 -left-12 sm:-left-16 w-10 h-10 bg-gray-800/50 rounded-lg shadow-lg flex items-center justify-center">
                 <svg
                     className="h-6 w-6 text-gray-400"
