@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage, ModelResponse
+from sqlalchemy.exc import IntegrityError
 
 from src.agent import agent, process_message
 from src.user_db.user_db_utilities import (
@@ -66,8 +67,16 @@ async def register(credentials: UserCredentials) -> dict[str, str]:
 
     Args:
         credentials: The user credentials containing email and password.
+
+    Raises:
+        HTTPException: If the email is already registered.
     """
-    user = create_user(credentials.email, credentials.password)
+    try:
+        user = create_user(credentials.email, credentials.password)
+    except IntegrityError as exc:
+        # Most commonly: unique constraint violation on users.email.
+        raise HTTPException(status_code=409, detail="Email already registered") from exc
+
     return {"status": "ok", "user_id": str(user.id)}
 
 
