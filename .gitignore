@@ -85,3 +85,4 @@ Thumbs.db
 *.log
 curl
 backend/src/api_test.ipynb
+backend/notebooks/api_test.ipynb

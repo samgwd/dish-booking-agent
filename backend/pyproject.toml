@@ -11,6 +11,11 @@ dependencies = [
     "mcp>=1.0.0",
     "pip>=25.3",
     "fastapi>=0.124.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
+    "bcrypt>=5.0.0",
 ]
 
 # mypy configuration
@@ -96,6 +101,7 @@ extend-exclude = [".gitignore", "LICENSE", ".*", "frontend/**"]
 
 [tool.typos.default.extend-words]
 center = "center"
+seed = "seed"
 
 [tool.typos.default]
 locale = "en-gb"
