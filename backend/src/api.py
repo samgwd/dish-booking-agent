@@ -5,18 +5,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage, ModelResponse
-from sqlalchemy.exc import IntegrityError
 
 from src.agent import agent, process_message
-from src.user_db.user_db_utilities import (
-    authenticate,
-    create_user,
-    delete_user,
-    logout_user,
-)
+from src.keycloak.keycloak_auth import KeycloakPrincipal, get_current_principal
 
 
 class UserCredentials(BaseModel):
@@ -61,86 +55,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/register")
-async def register(credentials: UserCredentials) -> dict[str, str]:
-    """Register a new user.
-
-    Args:
-        credentials: The user credentials containing email and password.
-
-    Raises:
-        HTTPException: If the email is already registered.
-    """
-    try:
-        user = create_user(credentials.email, credentials.password)
-    except IntegrityError as exc:
-        # Most commonly: unique constraint violation on users.email.
-        raise HTTPException(status_code=409, detail="Email already registered") from exc
-
-    return {"status": "ok", "user_id": str(user.id)}
-
-
-@app.post("/login")
-async def login(credentials: UserCredentials) -> dict[str, str]:
-    """Login a user.
-
-    Args:
-        credentials: The user credentials containing email and password.
-
-    Raises:
-        HTTPException: If the credentials are invalid.
-    """
-    user = authenticate(credentials.email, credentials.password)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    return {"status": "ok", "user_id": str(user.id)}
-
-
-@app.post("/logout")
-async def logout(request: UserIdRequest) -> dict[str, str]:
-    """Logout a user.
-
-    Args:
-        request: The request containing the user ID to logout.
-
-    Raises:
-        HTTPException: If the user is not found.
-    """
-    if not logout_user(request.user_id):
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"status": "ok"}
-
-
-@app.post("/delete-user")
-async def delete_user_account(request: UserIdRequest) -> dict[str, str]:
-    """Delete a user.
-
-    Args:
-        request: The request containing the user ID to delete.
-
-    Raises:
-        HTTPException: If the user is not found.
-    """
-    if not delete_user(request.user_id):
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"status": "ok"}
-
-
 @app.get("/send-message")
-async def send_message(message: str, session: str = "default") -> list[str]:
+async def send_message(
+    message: str,
+    session: str = "default",
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> list[str]:
     """Send a message to the API.
 
     Args:
         message: The message to send.
         session: The session to use.
+        principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Returns:
         A list of strings representing the response messages.
     """
-    history = message_histories[session]
+    session_key = f"{principal.sub}:{session}"
+    history = message_histories[session_key]
     prior_length = len(history)
     updated_history = await process_message(message, history)
-    message_histories[session] = updated_history
+    message_histories[session_key] = updated_history
 
     new_messages = updated_history[prior_length:]
     latest_response = next(

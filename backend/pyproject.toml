@@ -16,6 +16,7 @@ dependencies = [
     "ipykernel>=7.1.0",
     "jupyter>=1.1.1",
     "bcrypt>=5.0.0",
+    "pyjwt>=2.10.1",
 ]
 
 # mypy configuration
@@ -102,6 +103,8 @@ extend-exclude = [".gitignore", "LICENSE", ".*", "frontend/**"]
 [tool.typos.default.extend-words]
 center = "center"
 seed = "seed"
+UNAUTHORIZED = "UNAUTHORIZED"
+Authorization = "Authorization"
 
 [tool.typos.default]
 locale = "en-gb"
