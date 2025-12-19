@@ -3,7 +3,6 @@
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from uuid import UUID
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import HTTPException
@@ -27,16 +26,9 @@ class UserCredentials(BaseModel):
     password: str
 
 
-class UserIdRequest(BaseModel):
-    """Request body for endpoints requiring a user ID."""
-
-    user_id: UUID
-
-
 class SecretRequest(BaseModel):
     """Request body for storing a user secret."""
 
-    user_id: UUID
     key: str
     value: str
 
@@ -44,7 +36,6 @@ class SecretRequest(BaseModel):
 class SecretKeyRequest(BaseModel):
     """Request body for retrieving or deleting a specific secret."""
 
-    user_id: UUID
     key: str
 
 
@@ -78,58 +69,72 @@ def health() -> dict[str, str]:
 
 
 @app.post("/secrets")
-async def store_secret(request: SecretRequest) -> dict[str, str]:
-    """Store or update an encrypted secret for a user.
+async def store_secret(
+    request: SecretRequest,
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str]:
+    """Store or update an encrypted secret for the authenticated user.
 
     Args:
-        request: The request containing user_id, key, and value.
+        request: The request containing key and value.
+        principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Returns:
         Status confirmation.
     """
-    set_user_secret(request.user_id, request.key, request.value)
+    set_user_secret(principal.sub, request.key, request.value)
     return {"status": "ok"}
 
 
-@app.get("/secrets/{user_id}")
-async def list_secrets(user_id: UUID) -> dict[str, list[str]]:
-    """List all secret keys for a user (values are not returned).
+@app.get("/secrets")
+async def list_secrets(
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, list[str]]:
+    """List all secret keys for the authenticated user (values are not returned).
 
     Args:
-        user_id: The user ID to list secrets for.
+        principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Returns:
         A dict with a 'keys' list of secret key names.
     """
-    keys = list_user_secret_keys(user_id)
+    keys = list_user_secret_keys(principal.sub)
     return {"keys": keys}
 
 
 @app.post("/secrets/get")
-async def retrieve_secret(request: SecretKeyRequest) -> dict[str, str | None]:
-    """Retrieve a specific secret for a user.
+async def retrieve_secret(
+    request: SecretKeyRequest,
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str | None]:
+    """Retrieve a specific secret for the authenticated user.
 
     Args:
-        request: The request containing user_id and key.
+        request: The request containing the key.
+        principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Returns:
         The decrypted secret value, or null if not found.
     """
-    value = get_user_secret(request.user_id, request.key)
+    value = get_user_secret(principal.sub, request.key)
     return {"key": request.key, "value": value}
 
 
 @app.delete("/secrets")
-async def remove_secret(request: SecretKeyRequest) -> dict[str, str]:
-    """Delete a specific secret for a user.
+async def remove_secret(
+    request: SecretKeyRequest,
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str]:
+    """Delete a specific secret for the authenticated user.
 
     Args:
-        request: The request containing user_id and key.
+        request: The request containing the key.
+        principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Raises:
         HTTPException: If the secret is not found.
     """
-    if not delete_user_secret(request.user_id, request.key):
+    if not delete_user_secret(principal.sub, request.key):
         raise HTTPException(status_code=404, detail="Secret not found")
     return {"status": "ok"}
 
