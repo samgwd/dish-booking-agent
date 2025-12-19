@@ -6,7 +6,7 @@ import AuthControls from "@/components/AuthControls";
 import ChatInput from "@/components/ChatInput";
 import Message, { type MessageProps } from "@/components/Message";
 import { apiBase } from "@/lib/apiBase";
-import { getStoredAuth } from "@/lib/authStorage";
+import { useAuth } from "@/app/providers";
 const storageKey = "chatMessages";
 const signatureOf = (message: MessageProps): string =>
     `${message.author}|${message.isUser ? "user" : "assistant"}|${message.content}`;
@@ -20,6 +20,7 @@ const assistantAvatar =
 /** Chat transcript page that renders messages, handles sending, and syncs state to storage. */
 export default function MessagePage(): JSX.Element {
     const router = useRouter();
+    const { isInitialised, isAuthenticated, token } = useAuth();
     const [isReady, setIsReady] = useState(false);
     const [messages, setMessages] = useState<MessageProps[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -29,13 +30,13 @@ export default function MessagePage(): JSX.Element {
     const bottomRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        const stored = getStoredAuth();
-        if (!stored.userId) {
+        if (!isInitialised) return;
+        if (!isAuthenticated) {
             router.replace("/auth");
             return;
         }
         setIsReady(true);
-    }, [router]);
+    }, [isAuthenticated, isInitialised, router]);
 
     /** Ensure a stable session id exists and store it for reuse. */
     const ensureSessionId = useCallback((): string => {
@@ -96,7 +97,10 @@ export default function MessagePage(): JSX.Element {
                     session: sessionId
                 }).toString()}`;
 
-                const response = await fetch(url, { method: "GET" });
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+                });
 
                 if (!response.ok) {
                     throw new Error(`Request failed with status ${response.status}`);
@@ -127,7 +131,7 @@ export default function MessagePage(): JSX.Element {
                 setIsSending(false);
             }
         },
-        [ensureSessionId]
+        [ensureSessionId, token]
     );
 
     /** Apply chat page theming on mount and tidy up on unmount. */
