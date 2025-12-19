@@ -3,22 +3,23 @@
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthControls from "@/components/AuthControls";
-import { getStoredAuth } from "@/lib/authStorage";
+import { useAuth } from "@/app/providers";
 import "./booking/booking.css";
 
 export default function BookingLandingPage(): JSX.Element {
     const [inputValue, setInputValue] = useState<string>("");
     const [isReady, setIsReady] = useState<boolean>(false);
     const router = useRouter();
+    const { isInitialised, isAuthenticated } = useAuth();
 
     useEffect(() => {
-        const { userId } = getStoredAuth();
-        if (!userId) {
+        if (!isInitialised) return;
+        if (!isAuthenticated) {
             router.replace("/auth");
             return;
         }
         setIsReady(true);
-    }, [router]);
+    }, [isAuthenticated, isInitialised, router]);
 
     useEffect(() => {
         document.body.classList.add("room-booking-agent-body", "text-white", "font-display");

@@ -98,7 +98,7 @@ max-complexity = 5
 
 # typos configuration
 [tool.typos.files]
-extend-exclude = [".gitignore", "LICENSE", ".*", "frontend/**"]
+extend-exclude = [".gitignore", "LICENSE", ".*", "frontend/**", "backend/src/keycloak/themes/**"]
 
 [tool.typos.default.extend-words]
 center = "center"

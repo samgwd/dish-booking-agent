@@ -10,7 +10,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.7
-    command: start
+    command: start --import-realm --spi-theme-cache-themes=false --spi-theme-cache-templates=false
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
@@ -22,6 +22,9 @@ services:
       KC_HOSTNAME: localhost
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./realm-import:/opt/keycloak/data/import:ro
+      - ./themes:/opt/keycloak/themes:ro
     depends_on:
       - postgres
     ports:
