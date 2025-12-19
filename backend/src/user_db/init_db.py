@@ -1,7 +1,11 @@
 """Create all tables in the database."""
 
-from . import models  # noqa: F401 ensures models load so metadata has tables
-from .user_db import Base, engine
+from dotenv import load_dotenv
+
+load_dotenv()  # Load .env before importing modules that require env vars
+
+from . import models  # noqa: F401, E402 ensures models load so metadata has tables
+from .user_db import Base, engine  # noqa: E402
 
 
 def main() -> None:

@@ -8,6 +8,7 @@ import bcrypt
 from sqlalchemy import select
 
 from src.user_db import models
+from src.user_db.secrets import decrypt_secret, encrypt_secret
 from src.user_db.user_db import session_scope
 
 
@@ -155,3 +156,120 @@ def get_user_by_id(user_id: str | uuid.UUID) -> models.User | None:
     user_uuid = _coerce_user_id(user_id)
     with session_scope() as session:
         return session.scalar(select(models.User).where(models.User.id == user_uuid))
+
+
+def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.UserSecret:
+    """Store or update an encrypted secret for a user.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name (e.g., "DISH_COOKIE").
+        value: The plaintext secret value to encrypt and store.
+
+    Returns:
+        The created or updated UserSecret instance.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        existing = session.scalar(
+            select(models.UserSecret).where(
+                models.UserSecret.user_id == user_uuid,
+                models.UserSecret.key == key,
+            )
+        )
+        if existing:
+            existing.encrypted_value = encrypt_secret(value)
+            session.flush()
+            return existing
+
+        secret = models.UserSecret(
+            user_id=user_uuid,
+            key=key,
+            encrypted_value=encrypt_secret(value),
+        )
+        session.add(secret)
+        session.flush()
+        return secret
+
+
+def get_user_secret(user_id: str | uuid.UUID, key: str) -> str | None:
+    """Retrieve and decrypt a user's secret.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name to retrieve.
+
+    Returns:
+        The decrypted secret value, or None if not found.
+    """
+    from .secrets import decrypt_secret
+
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secret = session.scalar(
+            select(models.UserSecret).where(
+                models.UserSecret.user_id == user_uuid,
+                models.UserSecret.key == key,
+            )
+        )
+        if not secret:
+            return None
+        return decrypt_secret(secret.encrypted_value)
+
+
+def get_all_user_secrets(user_id: str | uuid.UUID) -> dict[str, str]:
+    """Get all decrypted secrets for a user as a dict.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        A dictionary mapping secret keys to their decrypted values.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secrets = session.scalars(
+            select(models.UserSecret).where(models.UserSecret.user_id == user_uuid)
+        ).all()
+        return {s.key: decrypt_secret(s.encrypted_value) for s in secrets}
+
+
+def delete_user_secret(user_id: str | uuid.UUID, key: str) -> bool:
+    """Delete a specific secret for a user.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name to delete.
+
+    Returns:
+        True if the secret existed and was deleted, False otherwise.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secret = session.scalar(
+            select(models.UserSecret).where(
+                models.UserSecret.user_id == user_uuid,
+                models.UserSecret.key == key,
+            )
+        )
+        if not secret:
+            return False
+        session.delete(secret)
+        return True
+
+
+def list_user_secret_keys(user_id: str | uuid.UUID) -> list[str]:
+    """List all secret keys for a user (without decrypting values).
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        A list of secret key names.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secrets = session.scalars(
+            select(models.UserSecret).where(models.UserSecret.user_id == user_uuid)
+        ).all()
+        return [s.key for s in secrets]
