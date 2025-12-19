@@ -6,6 +6,7 @@ import uuid
 
 import bcrypt
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from src.user_db import models
 from src.user_db.secrets import decrypt_secret, encrypt_secret
@@ -158,7 +159,7 @@ def get_user_by_id(user_id: str | uuid.UUID) -> models.User | None:
         return session.scalar(select(models.User).where(models.User.id == user_uuid))
 
 
-def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.UserSecret:
+def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.UserSecret | None:
     """Store or update an encrypted secret for a user.
 
     Args:
@@ -170,26 +171,19 @@ def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.Us
         The created or updated UserSecret instance.
     """
     user_uuid = _coerce_user_id(user_id)
+    encrypted = encrypt_secret(value)
     with session_scope() as session:
-        existing = session.scalar(
-            select(models.UserSecret).where(
-                models.UserSecret.user_id == user_uuid,
-                models.UserSecret.key == key,
+        stmt = (
+            insert(models.UserSecret)
+            .values(user_id=user_uuid, key=key, encrypted_value=encrypted)
+            .on_conflict_do_update(
+                constraint="uq_user_secrets_user_id_key",
+                set_={"encrypted_value": encrypted, "updated_at": models.utcnow()},
             )
+            .returning(models.UserSecret)
         )
-        if existing:
-            existing.encrypted_value = encrypt_secret(value)
-            session.flush()
-            return existing
-
-        secret = models.UserSecret(
-            user_id=user_uuid,
-            key=key,
-            encrypted_value=encrypt_secret(value),
-        )
-        session.add(secret)
-        session.flush()
-        return secret
+        result = session.scalar(stmt)
+        return result
 
 
 def get_user_secret(user_id: str | uuid.UUID, key: str) -> str | None:
@@ -202,8 +196,6 @@ def get_user_secret(user_id: str | uuid.UUID, key: str) -> str | None:
     Returns:
         The decrypted secret value, or None if not found.
     """
-    from .secrets import decrypt_secret
-
     user_uuid = _coerce_user_id(user_id)
     with session_scope() as session:
         secret = session.scalar(
