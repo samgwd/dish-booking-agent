@@ -17,7 +17,7 @@ from pydantic_ai.tools import RunContext
 from src.mcp_formatting import describe_tool_call
 from src.mcp_loader import load_mcp_servers_with_env
 
-# Load .env from project root (one level up from backend/)
+# Load .env from project root (three levels up from this file)
 _project_root = Path(__file__).resolve().parent.parent.parent
 load_dotenv(_project_root / ".env")
 
@@ -69,12 +69,12 @@ async def inject_dish_credentials(
         The result from the MCP tool call.
     """
     # Inject credentials for all dish-mcp tools
-    # NOTE: This hook is ONLY assigned to the dish-mcp server, so no prefix check needed
+    # NOTE: Tool names include the prefix (e.g., "dish_mcp_book_room")
     if ctx.deps and ctx.deps.dish:
         tool_args["cookie"] = ctx.deps.dish.cookie
         # Only inject user_info for tools that accept it (book_room)
         # check_availability_and_list_bookings and cancel_booking don't accept user_info
-        if name == "book_room":
+        if name.endswith("_book_room"):
             tool_args["user_info"] = {
                 "team_id": ctx.deps.dish.team_id,
                 "member_id": ctx.deps.dish.member_id,
@@ -191,6 +191,59 @@ async def process_message(
         print(f"Error: {e}")
         traceback.print_exc()
         return message_history
+
+
+StreamingEvent = tuple[str, str, list[ModelMessage]]
+
+
+async def process_message_streaming(
+    user_input: str,
+    message_history: list[ModelMessage],
+    deps: AgentDeps | None = None,
+) -> AsyncIterable[StreamingEvent]:
+    """Process a user message and yield streaming events.
+
+    This is designed for Server-Sent Events (SSE) streaming to keep the
+    connection alive during long-running agent operations.
+
+    Args:
+        user_input: The user's input message.
+        message_history: The history of messages between the user and the agent.
+        deps: Optional agent dependencies containing user credentials.
+
+    Yields:
+        Tuples of (event_type, data, updated_history) where:
+        - event_type: "text", "tool_call", "done", or "error"
+        - data: The text chunk, tool name, or error message
+        - updated_history: The updated message history (only populated on "done")
+    """
+    try:
+        with capture_run_messages() as captured_messages:
+            async with agent.run_stream(
+                user_input,
+                message_history=message_history,
+                deps=deps or AgentDeps(),
+            ) as result:
+                text_started = False
+                async for text in result.stream_text(delta=True):
+                    if not text_started:
+                        print("Agent: ", end="", flush=True)
+                        text_started = True
+                    print(text, end="", flush=True)
+                    # Yield each text chunk to keep connection alive
+                    yield ("text", text, [])
+
+        if text_started:
+            print()
+
+        new_messages = list(captured_messages)
+        updated_history = [*message_history, *new_messages]
+        yield ("done", "", updated_history)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        traceback.print_exc()
+        yield ("error", str(e), message_history)
 
 
 async def main() -> None:

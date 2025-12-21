@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env from project root (three levels up from user_db/)
+# Load .env from project root (four levels up from this file)
 _project_root = Path(__file__).resolve().parent.parent.parent.parent
 load_dotenv(_project_root / ".env")
 

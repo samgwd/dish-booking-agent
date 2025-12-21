@@ -1,21 +1,24 @@
 """API for the Dish Booking Agent."""
 
+import json
 from collections import defaultdict
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.exceptions import HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.messages import ModelMessage
 
 from src.agent import (
     AgentDeps,
     DishCredentials,
     GoogleCalendarTokens,
     agent,
-    process_message,
+    process_message_streaming,
 )
+from src.google_oauth import exchange_code_for_tokens, get_authorization_url
 from src.keycloak.keycloak_auth import KeycloakPrincipal, get_current_principal
 from src.user_db.user_db_utilities import (
     delete_user_secret,
@@ -151,7 +154,6 @@ def _build_agent_deps(secrets: dict[str, str]) -> AgentDeps:
     Returns:
         AgentDeps with credentials populated from secrets.
     """
-    # Build DiSH credentials if all required fields are present
     dish_creds = None
     if all(secrets.get(k) for k in ("DISH_COOKIE", "TEAM_ID", "MEMBER_ID")):
         dish_creds = DishCredentials(
@@ -160,7 +162,6 @@ def _build_agent_deps(secrets: dict[str, str]) -> AgentDeps:
             member_id=secrets["MEMBER_ID"],
         )
 
-    # Build Google Calendar tokens if access token is present
     gcal_tokens = None
     gcal_access = secrets.get("GOOGLE_CALENDAR_ACCESS_TOKEN")
     if gcal_access:
@@ -175,13 +176,152 @@ def _build_agent_deps(secrets: dict[str, str]) -> AgentDeps:
     return AgentDeps(dish=dish_creds, google_calendar=gcal_tokens)
 
 
+GOOGLE_CALENDAR_SECRET_KEYS = [
+    "GOOGLE_CALENDAR_ACCESS_TOKEN",
+    "GOOGLE_CALENDAR_REFRESH_TOKEN",
+    "GOOGLE_CALENDAR_EXPIRY_DATE",
+]
+
+
+@app.get("/oauth/google/authorize")
+async def initiate_google_oauth(
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str]:
+    """Initiate Google OAuth flow.
+
+    Args:
+        principal: The authenticated Keycloak principal.
+
+    Returns:
+        Authorization URL for redirecting the user.
+    """
+    state = principal.sub
+    authorization_url = get_authorization_url(state)
+    return {"authorization_url": authorization_url}
+
+
+@app.get("/oauth/google/callback")
+async def google_oauth_callback(
+    code: str,
+    state: str,
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str]:
+    """Handle Google OAuth callback and store tokens.
+
+    Args:
+        code: Authorization code from Google.
+        state: State parameter (should match user's sub).
+        principal: The authenticated Keycloak principal.
+
+    Returns:
+        Success status.
+
+    Raises:
+        HTTPException: If state doesn't match or token exchange fails.
+    """
+    if state != principal.sub:
+        raise HTTPException(status_code=403, detail="Invalid state parameter")
+
+    tokens = exchange_code_for_tokens(code)
+
+    ensure_user_exists(principal.sub, email=principal.email)
+
+    set_user_secret(principal.sub, "GOOGLE_CALENDAR_ACCESS_TOKEN", tokens["access_token"])
+    set_user_secret(principal.sub, "GOOGLE_CALENDAR_REFRESH_TOKEN", tokens["refresh_token"])
+    set_user_secret(principal.sub, "GOOGLE_CALENDAR_EXPIRY_DATE", tokens["expiry_date"])
+
+    return {"status": "ok", "message": "Google Calendar connected successfully"}
+
+
+@app.post("/oauth/google/disconnect")
+async def disconnect_google_oauth(
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, str]:
+    """Disconnect Google Calendar by removing stored tokens.
+
+    Args:
+        principal: The authenticated Keycloak principal.
+
+    Returns:
+        Success status.
+    """
+    for key in GOOGLE_CALENDAR_SECRET_KEYS:
+        delete_user_secret(principal.sub, key)
+
+    return {"status": "ok", "message": "Google Calendar disconnected"}
+
+
+@app.get("/oauth/google/status")
+async def google_oauth_status(
+    principal: KeycloakPrincipal = Depends(get_current_principal),
+) -> dict[str, bool]:
+    """Check if Google Calendar is connected.
+
+    Args:
+        principal: The authenticated Keycloak principal.
+
+    Returns:
+        Connection status.
+    """
+    access_token = get_user_secret(principal.sub, "GOOGLE_CALENDAR_ACCESS_TOKEN")
+    return {"connected": access_token is not None and len(access_token) > 0}
+
+
+def _format_sse_event(event_type: str, data: str | None = None) -> str:
+    """Format an SSE event as a JSON string.
+
+    Args:
+        event_type: The type of event (text, tool_call, done, error).
+        data: Optional data payload for the event.
+
+    Returns:
+        Formatted SSE event string.
+    """
+    payload: dict[str, str] = {"type": event_type}
+    if event_type == "text":
+        payload["content"] = data or ""
+    elif event_type == "tool_call":
+        payload["tool"] = data or ""
+    elif event_type == "error":
+        payload["message"] = data or ""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+async def _stream_agent_events(
+    message: str,
+    session_key: str,
+    history: list[ModelMessage],
+    deps: AgentDeps,
+) -> AsyncGenerator[str, None]:
+    """Generate SSE events from the agent's streaming response.
+
+    Args:
+        message: The user message to process.
+        session_key: The session key for storing history.
+        history: The current message history.
+        deps: Agent dependencies.
+
+    Yields:
+        Formatted SSE event strings.
+    """
+    try:
+        async for event_type, data, updated_history in process_message_streaming(
+            message, history, deps=deps
+        ):
+            yield _format_sse_event(event_type, data)
+            if event_type == "done":
+                message_histories[session_key] = updated_history
+    except Exception as e:
+        yield _format_sse_event("error", str(e))
+
+
 @app.get("/send-message")
 async def send_message(
     message: str,
     session: str = "default",
     principal: KeycloakPrincipal = Depends(get_current_principal),
-) -> list[str]:
-    """Send a message to the API.
+) -> StreamingResponse:
+    """Send a message to the API using Server-Sent Events (SSE).
 
     Args:
         message: The message to send.
@@ -189,27 +329,19 @@ async def send_message(
         principal: The authenticated Keycloak principal (derived from the Bearer token).
 
     Returns:
-        A list of strings representing the response messages.
+        A StreamingResponse with SSE events containing the agent's response.
     """
     secrets = get_all_user_secrets(principal.sub)
     deps = _build_agent_deps(secrets)
-
     session_key = f"{principal.sub}:{session}"
     history = message_histories[session_key]
-    prior_length = len(history)
-    updated_history = await process_message(message, history, deps=deps)
-    message_histories[session_key] = updated_history
 
-    new_messages = updated_history[prior_length:]
-    latest_response = next(
-        (msg for msg in reversed(new_messages) if isinstance(msg, ModelResponse)),
-        None,
+    return StreamingResponse(
+        _stream_agent_events(message, session_key, history, deps),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
-
-    if not latest_response:
-        return []
-
-    combined_response = "".join(
-        getattr(part, "content", "") for part in latest_response.parts
-    ).strip()
-    return [combined_response] if combined_response else []
