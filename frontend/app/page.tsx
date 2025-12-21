@@ -93,7 +93,7 @@ export default function BookingLandingPage(): JSX.Element {
                         <div className="relative flex items-center">
                             <input
                                 aria-label="Booking query input"
-                                className="w-full bg-transparent text-gray-200 placeholder-gray-500 border-none focus:ring-0 pl-4 pr-12 py-3 text-base"
+                                className="w-full bg-transparent text-gray-200 placeholder-gray-500 border-none focus:ring-0 focus:outline-none pl-4 pr-12 py-3 text-base"
                                 id="booking_query"
                                 name="booking_query"
                                 placeholder="e.g., Book a conference room for tomorrow at 10 AM"

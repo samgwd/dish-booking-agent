@@ -72,7 +72,7 @@ export default function MessagePage(): JSX.Element {
         ensureSessionId();
     }, [ensureSessionId, isReady]);
 
-    /** Send a user message to the backend, append responses, and handle transient errors. */
+    /** Send a user message to the backend using SSE streaming, append responses, and handle transient errors. */
     const handleSend = useCallback(
         async (content: string) => {
             setError(null);
@@ -89,6 +89,8 @@ export default function MessagePage(): JSX.Element {
             setMessages((prev) => [...prev, userMessage]);
             setIsSending(true);
 
+            let accumulatedText = "";
+            let assistantMessageAdded = false;
 
             try {
                 const sessionId = ensureSessionId();
@@ -99,31 +101,99 @@ export default function MessagePage(): JSX.Element {
 
                 const response = await fetch(url, {
                     method: "GET",
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        Accept: "text/event-stream"
+                    }
                 });
 
                 if (!response.ok) {
                     throw new Error(`Request failed with status ${response.status}`);
                 }
 
-                const payload = await response.json();
-                if (!Array.isArray(payload)) {
-                    throw new Error("Unexpected response shape");
+                const reader = response.body?.getReader();
+                if (!reader) {
+                    throw new Error("Response body is not readable");
                 }
 
+                const decoder = new TextDecoder();
                 const replyTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-                setMessages((prev) => {
-                    const nextMessages = payload
-                        .map((text) => ({
+                // Buffer for incomplete lines across chunk boundaries
+                let lineBuffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = lineBuffer + decoder.decode(value, { stream: true });
+                    lineBuffer = "";
+
+                    const lines = chunk.split("\n");
+
+                    if (!chunk.endsWith("\n") && lines.length > 0) {
+                        lineBuffer = lines.pop() ?? "";
+                    }
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            try {
+                                const eventData = JSON.parse(line.slice(6));
+
+                                if (eventData.type === "text") {
+                                    accumulatedText += eventData.content;
+
+                                    if (!assistantMessageAdded) {
+                                        assistantMessageAdded = true;
+                                        setMessages((prev) => [
+                                            ...prev,
+                                            {
+                                                author: "AI Assistant",
+                                                time: replyTime,
+                                                content: accumulatedText,
+                                                isUser: false,
+                                                avatarUrl: assistantAvatar
+                                            }
+                                        ]);
+                                    } else {
+                                        setMessages((prev) => {
+                                            const updated = [...prev];
+                                            const lastIdx = updated.length - 1;
+                                            if (lastIdx >= 0 && !updated[lastIdx].isUser) {
+                                                updated[lastIdx] = {
+                                                    ...updated[lastIdx],
+                                                    content: accumulatedText
+                                                };
+                                            }
+                                            return updated;
+                                        });
+                                    }
+                                } else if (eventData.type === "tool_call") {
+                                    console.log("[Tool Call]", eventData.tool);
+                                } else if (eventData.type === "error") {
+                                    throw new Error(eventData.message);
+                                }
+                            } catch (parseError) {
+                                if (line.slice(6).trim()) {
+                                    console.warn("Failed to parse SSE data:", line);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!assistantMessageAdded) {
+                    setMessages((prev) => [
+                        ...prev,
+                        {
                             author: "AI Assistant",
                             time: replyTime,
-                            content: text,
+                            content: "I processed your request but have no response to show.",
                             isUser: false,
                             avatarUrl: assistantAvatar
-                        }))
-                    return [...prev, ...nextMessages];
-                });
+                        }
+                    ]);
+                }
             } catch (fetchError) {
                 console.error(fetchError);
                 setError("Unable to reach the booking service. Please try again.");

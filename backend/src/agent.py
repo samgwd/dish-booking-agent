@@ -6,24 +6,111 @@ from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
-from mcp import ClientSession
 from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai.mcp import CallToolFunc, ToolResult
 from pydantic_ai.messages import AgentStreamEvent, FunctionToolCallEvent, ModelMessage
 from pydantic_ai.tools import RunContext
 
 from src.mcp_formatting import describe_tool_call
 from src.mcp_loader import load_mcp_servers_with_env
 
-load_dotenv()
+# Load .env from project root (three levels up from this file)
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
+
+
+@dataclass
+class DishCredentials:
+    """Credentials for DiSH room booking."""
+
+    cookie: str
+    team_id: str
+    member_id: str
+
+
+@dataclass
+class GoogleCalendarTokens:
+    """OAuth tokens for Google Calendar API."""
+
+    access_token: str
+    refresh_token: str
+    expiry_date: int  # Unix timestamp in milliseconds
 
 
 @dataclass
 class AgentDeps:
     """Dependencies for the Dish Booking Agent."""
 
-    sessions: dict[str, ClientSession]
+    dish: DishCredentials | None = None
+    google_calendar: GoogleCalendarTokens | None = None
+
+
+async def inject_dish_credentials(
+    ctx: RunContext[AgentDeps],
+    call_tool: CallToolFunc,
+    name: str,
+    tool_args: dict[str, Any],
+) -> ToolResult:
+    """Inject user credentials into DiSH MCP tool calls.
+
+    This is a process_tool_call hook that intercepts MCP tool calls and
+    automatically injects the user's DiSH credentials from AgentDeps.
+
+    Args:
+        ctx: The run context containing AgentDeps with credentials.
+        call_tool: The function to call the underlying MCP tool.
+        name: The name of the tool being called.
+        tool_args: The arguments for the tool call.
+
+    Returns:
+        The result from the MCP tool call.
+    """
+    # Inject credentials for all dish-mcp tools
+    # NOTE: Tool names include the prefix (e.g., "dish_mcp_book_room")
+    if ctx.deps and ctx.deps.dish:
+        tool_args["cookie"] = ctx.deps.dish.cookie
+        # Only inject user_info for tools that accept it (book_room)
+        # check_availability_and_list_bookings and cancel_booking don't accept user_info
+        if name.endswith("_book_room"):
+            tool_args["user_info"] = {
+                "team_id": ctx.deps.dish.team_id,
+                "member_id": ctx.deps.dish.member_id,
+            }
+    return await call_tool(name, tool_args, {})
+
+
+async def inject_google_calendar_credentials(
+    ctx: RunContext[AgentDeps],
+    call_tool: CallToolFunc,
+    name: str,
+    tool_args: dict[str, Any],
+) -> ToolResult:
+    """Inject OAuth credentials into Google Calendar MCP tool calls.
+
+    This is a process_tool_call hook that intercepts MCP tool calls and
+    automatically injects the user's Google Calendar OAuth tokens from AgentDeps.
+
+    Args:
+        ctx: The run context containing AgentDeps with credentials.
+        call_tool: The function to call the underlying MCP tool.
+        name: The name of the tool being called.
+        tool_args: The arguments for the tool call.
+
+    Returns:
+        The result from the MCP tool call.
+    """
+    # Inject OAuth credentials for all google-calendar tools
+    if ctx.deps and ctx.deps.google_calendar:
+        tool_args["oauth_credentials"] = {
+            "access_token": ctx.deps.google_calendar.access_token,
+            "refresh_token": ctx.deps.google_calendar.refresh_token,
+            "expiry_date": ctx.deps.google_calendar.expiry_date,
+        }
+
+    return await call_tool(name, tool_args, {})
 
 
 async def log_mcp_activity(
@@ -39,7 +126,13 @@ async def log_mcp_activity(
 
 project_root = Path(__file__).resolve().parent.parent
 config_path = project_root / "mcp_config.json"
-mcp_toolsets = load_mcp_servers_with_env(str(config_path))
+mcp_toolsets = load_mcp_servers_with_env(
+    str(config_path),
+    tool_processors={
+        "dish-mcp": inject_dish_credentials,
+        "google-calendar": inject_google_calendar_credentials,
+    },
+)
 
 agent = Agent(
     "openai:gpt-5-nano",
@@ -51,7 +144,7 @@ agent = Agent(
         "Use Dish tools for room availability and booking; use Google Calendar tools to list "
         "events, check calendar availability, and create/update/delete meetings. "
         "Google Calendar is the source of truth for calendar events—only create/update/delete when "
-        "explicitly asked or clearly implied (e.g., “Reschedule that meeting to 3pm tomorrow”); "
+        "explicitly asked or clearly implied (e.g., 'Reschedule that meeting to 3pm tomorrow'); "
         "confirm before destructive actions if instructions are ambiguous. "
         "Coordinate room bookings with calendar availability whenever scheduling meetings. "
         "Convert user time suggestions to the format expected by each tool. "
@@ -63,13 +156,16 @@ agent = Agent(
 
 
 async def process_message(
-    user_input: str, message_history: list[ModelMessage]
+    user_input: str,
+    message_history: list[ModelMessage],
+    deps: AgentDeps | None = None,
 ) -> list[ModelMessage]:
     """Process a user message and return updated message history.
 
     Args:
         user_input: The user's input message.
         message_history: The history of messages between the user and the agent.
+        deps: Optional agent dependencies containing user credentials.
 
     Returns:
         The updated message history.
@@ -79,6 +175,7 @@ async def process_message(
             async with agent.run_stream(
                 user_input,
                 message_history=message_history,
+                deps=deps or AgentDeps(),
             ) as result:
                 text_started = False
                 async for text in result.stream_text(delta=True):
@@ -94,6 +191,59 @@ async def process_message(
         print(f"Error: {e}")
         traceback.print_exc()
         return message_history
+
+
+StreamingEvent = tuple[str, str, list[ModelMessage]]
+
+
+async def process_message_streaming(
+    user_input: str,
+    message_history: list[ModelMessage],
+    deps: AgentDeps | None = None,
+) -> AsyncIterable[StreamingEvent]:
+    """Process a user message and yield streaming events.
+
+    This is designed for Server-Sent Events (SSE) streaming to keep the
+    connection alive during long-running agent operations.
+
+    Args:
+        user_input: The user's input message.
+        message_history: The history of messages between the user and the agent.
+        deps: Optional agent dependencies containing user credentials.
+
+    Yields:
+        Tuples of (event_type, data, updated_history) where:
+        - event_type: "text", "tool_call", "done", or "error"
+        - data: The text chunk, tool name, or error message
+        - updated_history: The updated message history (only populated on "done")
+    """
+    try:
+        with capture_run_messages() as captured_messages:
+            async with agent.run_stream(
+                user_input,
+                message_history=message_history,
+                deps=deps or AgentDeps(),
+            ) as result:
+                text_started = False
+                async for text in result.stream_text(delta=True):
+                    if not text_started:
+                        print("Agent: ", end="", flush=True)
+                        text_started = True
+                    print(text, end="", flush=True)
+                    # Yield each text chunk to keep connection alive
+                    yield ("text", text, [])
+
+        if text_started:
+            print()
+
+        new_messages = list(captured_messages)
+        updated_history = [*message_history, *new_messages]
+        yield ("done", "", updated_history)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        traceback.print_exc()
+        yield ("error", str(e), message_history)
 
 
 async def main() -> None:

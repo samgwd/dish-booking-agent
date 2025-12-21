@@ -36,7 +36,7 @@ export default function AuthPage(): JSX.Element {
                         onClick={() => void login()}
                         className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-colors hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        {!isInitialised ? "Loading..." : "Sign in with Keycloak"}
+                        {!isInitialised ? "Loading..." : "Sign in"}
                     </button>
 
                     <button

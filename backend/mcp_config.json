@@ -7,12 +7,12 @@
                 "${DISH_MCP_PATH}/src/mcp_server.py"
             ],
             "cwd": "${DISH_MCP_PATH}",
+            "transport": "stdio",
             "env": {
-                "DISH_COOKIE": "${DISH_COOKIE}",
-                "TEAM_ID": "${TEAM_ID}",
-                "MEMBER_ID": "${MEMBER_ID}"
-            },
-            "transport": "stdio"
+                "DISH_COOKIE": "",
+                "TEAM_ID": "",
+                "MEMBER_ID": ""
+            }
         },
         "google-calendar": {
             "command": "docker",
@@ -25,7 +25,8 @@
                 "--mount",
                 "type=volume,src=google-calendar-mcp_calendar-tokens,dst=/home/nodejs/.config/google-calendar-mcp",
                 "calendar-mcp"
-            ]
+            ],
+            "transport": "stdio"
         }
     }
 }
