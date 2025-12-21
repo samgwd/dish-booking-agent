@@ -9,11 +9,12 @@ from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage, ModelResponse
 
-from src.agent import agent, process_message
+from src.agent import AgentDeps, agent, process_message
 from src.keycloak.keycloak_auth import KeycloakPrincipal, get_current_principal
 from src.user_db.user_db_utilities import (
     delete_user_secret,
     ensure_user_exists,
+    get_all_user_secrets,
     get_user_secret,
     list_user_secret_keys,
     set_user_secret,
@@ -151,10 +152,17 @@ async def send_message(
     Returns:
         A list of strings representing the response messages.
     """
+    secrets = get_all_user_secrets(principal.sub)
+    deps = AgentDeps(
+        dish_cookie=secrets.get("DISH_COOKIE"),
+        team_id=secrets.get("TEAM_ID"),
+        member_id=secrets.get("MEMBER_ID"),
+    )
+
     session_key = f"{principal.sub}:{session}"
     history = message_histories[session_key]
     prior_length = len(history)
-    updated_history = await process_message(message, history)
+    updated_history = await process_message(message, history, deps=deps)
     message_histories[session_key] = updated_history
 
     new_messages = updated_history[prior_length:]

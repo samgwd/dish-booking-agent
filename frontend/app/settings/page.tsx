@@ -12,7 +12,7 @@ type CredentialKey = (typeof CREDENTIAL_KEYS)[number];
 
 const CREDENTIAL_INFO: Record<CredentialKey, { label: string; description: string; placeholder: string }> = {
     DISH_COOKIE: {
-        label: "Dish Cookie",
+        label: "DiSH Cookie",
         description: "Your session cookie from Dish (connect.sid=...)",
         placeholder: "connect.sid=s%3A...",
     },
@@ -219,7 +219,7 @@ export default function SettingsPage(): JSX.Element {
                         Settings
                     </h1>
                     <p className="text-slate-400 mt-2 text-base">
-                        Configure your Dish booking credentials
+                        Configure your DiSH booking credentials
                     </p>
                 </header>
 
@@ -232,7 +232,7 @@ export default function SettingsPage(): JSX.Element {
 
                 {/* Credentials card */}
                 <div className="settings-card rounded-2xl p-6 md:p-8">
-                    <h2 className="text-lg font-semibold text-white mb-1">Dish Credentials</h2>
+                    <h2 className="text-lg font-semibold text-white mb-1">DiSH Credentials</h2>
                     <p className="text-sm text-slate-400 mb-6">
                         These credentials are required for the booking agent to interact with Dish on your behalf.
                         Use the{" "}

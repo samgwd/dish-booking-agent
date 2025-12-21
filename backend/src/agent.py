@@ -6,10 +6,11 @@ from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
-from mcp import ClientSession
 from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai.mcp import CallToolFunc, ToolResult
 from pydantic_ai.messages import AgentStreamEvent, FunctionToolCallEvent, ModelMessage
 from pydantic_ai.tools import RunContext
 
@@ -25,7 +26,43 @@ load_dotenv(_project_root / ".env")
 class AgentDeps:
     """Dependencies for the Dish Booking Agent."""
 
-    sessions: dict[str, ClientSession]
+    dish_cookie: str | None = None
+    team_id: str | None = None
+    member_id: str | None = None
+
+
+async def inject_dish_credentials(
+    ctx: RunContext[AgentDeps],
+    call_tool: CallToolFunc,
+    name: str,
+    tool_args: dict[str, Any],
+) -> ToolResult:
+    """Inject user credentials into DiSH MCP tool calls.
+
+    This is a process_tool_call hook that intercepts MCP tool calls and
+    automatically injects the user's DiSH credentials from AgentDeps.
+
+    Args:
+        ctx: The run context containing AgentDeps with credentials.
+        call_tool: The function to call the underlying MCP tool.
+        name: The name of the tool being called.
+        tool_args: The arguments for the tool call.
+
+    Returns:
+        The result from the MCP tool call.
+    """
+    # Inject credentials for all dish-mcp tools
+    # NOTE: This hook is ONLY assigned to the dish-mcp server, so no prefix check needed
+    if ctx.deps and ctx.deps.dish_cookie:
+        tool_args["cookie"] = ctx.deps.dish_cookie
+    # Only inject user_info for tools that accept it (book_room)
+    # check_availability_and_list_bookings and cancel_booking don't accept user_info
+    if name == "book_room" and ctx.deps and ctx.deps.team_id and ctx.deps.member_id:
+        tool_args["user_info"] = {
+            "team_id": ctx.deps.team_id,
+            "member_id": ctx.deps.member_id,
+        }
+    return await call_tool(name, tool_args, {})
 
 
 async def log_mcp_activity(
@@ -41,7 +78,7 @@ async def log_mcp_activity(
 
 project_root = Path(__file__).resolve().parent.parent
 config_path = project_root / "mcp_config.json"
-mcp_toolsets = load_mcp_servers_with_env(str(config_path))
+mcp_toolsets = load_mcp_servers_with_env(str(config_path), inject_dish_credentials)
 
 agent = Agent(
     "openai:gpt-5-nano",
@@ -65,13 +102,16 @@ agent = Agent(
 
 
 async def process_message(
-    user_input: str, message_history: list[ModelMessage]
+    user_input: str,
+    message_history: list[ModelMessage],
+    deps: AgentDeps | None = None,
 ) -> list[ModelMessage]:
     """Process a user message and return updated message history.
 
     Args:
         user_input: The user's input message.
         message_history: The history of messages between the user and the agent.
+        deps: Optional agent dependencies containing user credentials.
 
     Returns:
         The updated message history.
@@ -81,6 +121,7 @@ async def process_message(
             async with agent.run_stream(
                 user_input,
                 message_history=message_history,
+                deps=deps or AgentDeps(),
             ) as result:
                 text_started = False
                 async for text in result.stream_text(delta=True):

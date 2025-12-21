@@ -46,7 +46,7 @@ def print_credentials(credentials: DishCredentials) -> None:
         )
     )
 
-    table = Table(title="Your Dish Credentials", show_header=True, header_style="bold cyan")
+    table = Table(title="Your DiSH Credentials", show_header=True, header_style="bold cyan")
     table.add_column("Key", style="dim")
     table.add_column("Value", style="green")
     table.add_column("Status", justify="center")

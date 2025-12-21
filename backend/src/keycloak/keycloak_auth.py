@@ -48,6 +48,13 @@ def _required_env(name: str) -> str:
 KEYCLOAK_BASE_URL = _required_env("KEYCLOAK_BASE_URL")
 KEYCLOAK_REALM = _required_env("KEYCLOAK_REALM")
 KEYCLOAK_CLIENT_ID = _required_env("KEYCLOAK_CLIENT_ID")
+# Optional: frontend client ID whose tokens the backend should also accept
+KEYCLOAK_FRONTEND_CLIENT_ID = os.environ.get("KEYCLOAK_FRONTEND_CLIENT_ID")
+
+# Build a set of allowed client IDs for token validation
+_ALLOWED_CLIENTS: set[str] = {KEYCLOAK_CLIENT_ID}
+if KEYCLOAK_FRONTEND_CLIENT_ID:
+    _ALLOWED_CLIENTS.add(KEYCLOAK_FRONTEND_CLIENT_ID)
 
 ISSUER = f"{KEYCLOAK_BASE_URL}/realms/{KEYCLOAK_REALM}"
 JWKS_URL = f"{ISSUER}/protocol/openid-connect/certs"
@@ -107,7 +114,10 @@ def _verify_and_decode(token: str) -> dict[str, Any]:
         aud_list = [aud]
 
     azp = claims.get("azp")
-    if KEYCLOAK_CLIENT_ID not in aud_list and azp != KEYCLOAK_CLIENT_ID:
+    # Check if token is for an allowed client (either via aud or azp)
+    aud_matches = bool(_ALLOWED_CLIENTS & set(aud_list))
+    azp_matches = azp in _ALLOWED_CLIENTS
+    if not aud_matches and not azp_matches:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token not issued for this client",
