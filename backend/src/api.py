@@ -13,17 +13,11 @@ from src.agent import agent, process_message
 from src.keycloak.keycloak_auth import KeycloakPrincipal, get_current_principal
 from src.user_db.user_db_utilities import (
     delete_user_secret,
+    ensure_user_exists,
     get_user_secret,
     list_user_secret_keys,
     set_user_secret,
 )
-
-
-class UserCredentials(BaseModel):
-    """Request body for user authentication endpoints."""
-
-    email: str
-    password: str
 
 
 class SecretRequest(BaseModel):
@@ -82,6 +76,8 @@ async def store_secret(
     Returns:
         Status confirmation.
     """
+    # Auto-provision user in local DB if this is their first interaction
+    ensure_user_exists(principal.sub, email=principal.email)
     set_user_secret(principal.sub, request.key, request.value)
     return {"status": "ok"}
 

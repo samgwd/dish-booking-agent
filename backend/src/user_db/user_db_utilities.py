@@ -4,61 +4,12 @@ from __future__ import annotations
 
 import uuid
 
-import bcrypt
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from src.user_db import models
 from src.user_db.secrets import decrypt_secret, encrypt_secret
 from src.user_db.user_db import session_scope
-
-
-def hash_password(password: str, rounds: int = 12) -> str:
-    """Hash a password with bcrypt (adjust rounds for cost).
-
-    Args:
-        password: The password to hash.
-        rounds: The number of rounds to use for the hash.
-
-    Returns:
-        The hashed password.
-    """
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds)).decode("utf-8")
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify a password against a hashed password.
-
-    Args:
-        password: The password to verify.
-        hashed: The hashed password to verify against.
-
-    Returns:
-        True if the password is verified, False otherwise.
-    """
-    try:
-        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
-    except ValueError:
-        return False
-
-
-def authenticate(email: str, password: str) -> models.User | None:
-    """Authenticate a user.
-
-    Args:
-        email: The email of the user.
-        password: The password of the user.
-
-    Returns:
-        The authenticated user if successful, None otherwise.
-    """
-    with session_scope() as session:
-        user = session.scalar(select(models.User).where(models.User.email == email))
-        if not user or not user.is_active:
-            return None
-        if not verify_password(password, user.password_hash):
-            return None
-        return user
 
 
 def create_user(email: str, password: str) -> models.User:
@@ -72,7 +23,7 @@ def create_user(email: str, password: str) -> models.User:
         The created user.
     """
     with session_scope() as session:
-        user = models.User(email=email, password_hash=hash_password(password))
+        user = models.User(email=email)
         session.add(user)
         session.flush()
         return user
@@ -157,6 +108,39 @@ def get_user_by_id(user_id: str | uuid.UUID) -> models.User | None:
     user_uuid = _coerce_user_id(user_id)
     with session_scope() as session:
         return session.scalar(select(models.User).where(models.User.id == user_uuid))
+
+
+def ensure_user_exists(
+    keycloak_sub: str | uuid.UUID,
+    email: str | None = None,
+) -> models.User:
+    """Ensure a user exists in the local database, creating if necessary.
+
+    This is used to auto-provision Keycloak users in the local database
+    on first interaction (e.g., when storing secrets).
+
+    Args:
+        keycloak_sub: The Keycloak subject (user ID) as a UUID or UUID string.
+        email: Optional email address from Keycloak.
+
+    Returns:
+        The existing or newly created User object.
+    """
+    user_uuid = _coerce_user_id(keycloak_sub)
+    with session_scope() as session:
+        user = session.scalar(select(models.User).where(models.User.id == user_uuid))
+        if user:
+            return user
+
+        placeholder_email = email or f"{user_uuid}@keycloak.local"
+        user = models.User(
+            id=user_uuid,
+            email=placeholder_email,
+            is_active=True,
+        )
+        session.add(user)
+        session.flush()
+        return user
 
 
 def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.UserSecret | None:
