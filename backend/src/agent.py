@@ -16,6 +16,8 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     ModelMessage,
     PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
     TextPartDelta,
 )
 from pydantic_ai.tools import RunContext
@@ -213,6 +215,28 @@ class _StreamState:
         self.text_started = False
         self.updated_history: list[ModelMessage] = []
 
+    def emit_text(self, content: str) -> StreamingEvent:
+        """Print text content and return the corresponding streaming event.
+
+        Args:
+            content: The text content to emit.
+
+        Returns:
+            A streaming event tuple for the text content.
+        """
+        if not self.text_started:
+            print("Agent: ", end="", flush=True)
+            self.text_started = True
+        print(content, end="", flush=True)
+        return ("text", content, [])
+
+
+def _handle_tool_call(event: FunctionToolCallEvent) -> StreamingEvent:
+    """Handle a function tool call event."""
+    desc = describe_tool_call(event.part.tool_name, event.part.args_as_dict())
+    print(f"\n[MCP] {desc}", flush=True)
+    return ("tool_call", desc, [])
+
 
 def _process_event(
     event: AgentStreamEvent | AgentRunResultEvent[str],
@@ -236,16 +260,13 @@ def _process_event(
         return None
 
     if isinstance(event, FunctionToolCallEvent):
-        desc = describe_tool_call(event.part.tool_name, event.part.args_as_dict())
-        print(f"\n[MCP] {desc}", flush=True)
-        return ("tool_call", desc, [])
+        return _handle_tool_call(event)
+
+    if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+        return state.emit_text(event.part.content) if event.part.content else None
 
     if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-        if not state.text_started:
-            print("Agent: ", end="", flush=True)
-            state.text_started = True
-        print(event.delta.content_delta, end="", flush=True)
-        return ("text", event.delta.content_delta, [])
+        return state.emit_text(event.delta.content_delta)
 
     return None
 
