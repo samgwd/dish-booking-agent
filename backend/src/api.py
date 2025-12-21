@@ -9,7 +9,13 @@ from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 from pydantic_ai.messages import ModelMessage, ModelResponse
 
-from src.agent import AgentDeps, agent, process_message
+from src.agent import (
+    AgentDeps,
+    DishCredentials,
+    GoogleCalendarTokens,
+    agent,
+    process_message,
+)
 from src.keycloak.keycloak_auth import KeycloakPrincipal, get_current_principal
 from src.user_db.user_db_utilities import (
     delete_user_secret,
@@ -136,6 +142,39 @@ async def remove_secret(
     return {"status": "ok"}
 
 
+def _build_agent_deps(secrets: dict[str, str]) -> AgentDeps:
+    """Build AgentDeps from user secrets.
+
+    Args:
+        secrets: Dictionary of user secrets.
+
+    Returns:
+        AgentDeps with credentials populated from secrets.
+    """
+    # Build DiSH credentials if all required fields are present
+    dish_creds = None
+    if all(secrets.get(k) for k in ("DISH_COOKIE", "TEAM_ID", "MEMBER_ID")):
+        dish_creds = DishCredentials(
+            cookie=secrets["DISH_COOKIE"],
+            team_id=secrets["TEAM_ID"],
+            member_id=secrets["MEMBER_ID"],
+        )
+
+    # Build Google Calendar tokens if access token is present
+    gcal_tokens = None
+    gcal_access = secrets.get("GOOGLE_CALENDAR_ACCESS_TOKEN")
+    if gcal_access:
+        gcal_refresh = secrets.get("GOOGLE_CALENDAR_REFRESH_TOKEN", "")
+        gcal_expiry = secrets.get("GOOGLE_CALENDAR_EXPIRY_DATE", "0")
+        gcal_tokens = GoogleCalendarTokens(
+            access_token=gcal_access,
+            refresh_token=gcal_refresh,
+            expiry_date=int(gcal_expiry) if gcal_expiry else 0,
+        )
+
+    return AgentDeps(dish=dish_creds, google_calendar=gcal_tokens)
+
+
 @app.get("/send-message")
 async def send_message(
     message: str,
@@ -153,11 +192,7 @@ async def send_message(
         A list of strings representing the response messages.
     """
     secrets = get_all_user_secrets(principal.sub)
-    deps = AgentDeps(
-        dish_cookie=secrets.get("DISH_COOKIE"),
-        team_id=secrets.get("TEAM_ID"),
-        member_id=secrets.get("MEMBER_ID"),
-    )
+    deps = _build_agent_deps(secrets)
 
     session_key = f"{principal.sub}:{session}"
     history = message_histories[session_key]

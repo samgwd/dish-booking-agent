@@ -50,22 +50,22 @@ def load_mcp_config_with_env(config_path: str) -> dict[str, Any]:
 
 def create_mcp_toolsets(
     config: dict[str, Any],
-    dish_tool_processor: ProcessToolCallFunc | None = None,
+    tool_processors: dict[str, ProcessToolCallFunc] | None = None,
 ) -> list[MCPServerStdio]:
     """Create MCP toolsets from config dict.
 
     Args:
         config: The MCP configuration dictionary.
-        dish_tool_processor: Optional process_tool_call callback for the dish-mcp server.
-            This allows injecting credentials into tool calls.
+        tool_processors: Optional dict mapping server names to process_tool_call callbacks.
+            This allows injecting credentials into tool calls for specific servers.
 
     Returns:
         A list of MCPServerStdio instances.
     """
+    tool_processors = tool_processors or {}
     toolsets = []
     for name, server_config in config.get("mcpServers", {}).items():
-        # Apply the dish_tool_processor only to dish-mcp server
-        processor = dish_tool_processor if name == "dish-mcp" else None
+        processor = tool_processors.get(name)
         # Use underscores in tool_prefix for valid Python identifiers
         tool_prefix = name.replace("-", "_")
         toolset = MCPServerStdio(
@@ -82,7 +82,7 @@ def create_mcp_toolsets(
 
 def load_mcp_servers_with_env(
     config_path: str,
-    dish_tool_processor: ProcessToolCallFunc | None = None,
+    tool_processors: dict[str, ProcessToolCallFunc] | None = None,
 ) -> list[MCPServerStdio]:
     """Load MCP servers from config file with environment variable substitution.
 
@@ -91,10 +91,10 @@ def load_mcp_servers_with_env(
 
     Args:
         config_path: Path to the MCP config file.
-        dish_tool_processor: Optional process_tool_call callback for the dish-mcp server.
+        tool_processors: Optional dict mapping server names to process_tool_call callbacks.
 
     Returns:
         A list of MCPServerStdio instances.
     """
     config = load_mcp_config_with_env(config_path)
-    return create_mcp_toolsets(config, dish_tool_processor)
+    return create_mcp_toolsets(config, tool_processors)
