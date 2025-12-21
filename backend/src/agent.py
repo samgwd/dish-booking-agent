@@ -16,7 +16,9 @@ from pydantic_ai.tools import RunContext
 from src.mcp_formatting import describe_tool_call
 from src.mcp_loader import load_mcp_servers_with_env
 
-load_dotenv()
+# Load .env from project root (one level up from backend/)
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
 
 
 @dataclass
