@@ -9,9 +9,15 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic_ai import Agent, capture_run_messages
+from pydantic_ai import Agent, AgentRunResultEvent, capture_run_messages
 from pydantic_ai.mcp import CallToolFunc, ToolResult
-from pydantic_ai.messages import AgentStreamEvent, FunctionToolCallEvent, ModelMessage
+from pydantic_ai.messages import (
+    AgentStreamEvent,
+    FunctionToolCallEvent,
+    ModelMessage,
+    PartDeltaEvent,
+    TextPartDelta,
+)
 from pydantic_ai.tools import RunContext
 
 from src.mcp_formatting import describe_tool_call
@@ -102,7 +108,6 @@ async def inject_google_calendar_credentials(
     Returns:
         The result from the MCP tool call.
     """
-    # Inject OAuth credentials for all google-calendar tools
     if ctx.deps and ctx.deps.google_calendar:
         tool_args["oauth_credentials"] = {
             "access_token": ctx.deps.google_calendar.access_token,
@@ -116,7 +121,12 @@ async def inject_google_calendar_credentials(
 async def log_mcp_activity(
     _run_ctx: RunContext[AgentDeps], events: AsyncIterable[AgentStreamEvent]
 ) -> None:
-    """Event handler that logs whenever the agent triggers an MCP tool."""
+    """Event handler that logs whenever the agent triggers an MCP tool.
+
+    Args:
+        _run_ctx: The run context containing AgentDeps.
+        events: The events to log.
+    """
     async for event in events:
         if isinstance(event, FunctionToolCallEvent) and (
             message := describe_tool_call(event.part.tool_name, event.part.args_as_dict())
@@ -196,6 +206,50 @@ async def process_message(
 StreamingEvent = tuple[str, str, list[ModelMessage]]
 
 
+class _StreamState:
+    """Mutable state container for streaming events."""
+
+    def __init__(self) -> None:
+        self.text_started = False
+        self.updated_history: list[ModelMessage] = []
+
+
+def _process_event(
+    event: AgentStreamEvent | AgentRunResultEvent[str],
+    state: _StreamState,
+    message_history: list[ModelMessage],
+    captured_messages: list[ModelMessage],
+) -> StreamingEvent | None:
+    """Process a single agent stream event and return a streaming event if applicable.
+
+    Arguments:
+        event: The agent stream event to process.
+        state: The mutable state container for streaming events.
+        message_history: The history of messages between the user and the agent.
+        captured_messages: The captured messages from the agent run.
+
+    Returns:
+        A streaming event if applicable, otherwise None.
+    """
+    if isinstance(event, AgentRunResultEvent):
+        state.updated_history = [*message_history, *captured_messages]
+        return None
+
+    if isinstance(event, FunctionToolCallEvent):
+        desc = describe_tool_call(event.part.tool_name, event.part.args_as_dict())
+        print(f"\n[MCP] {desc}", flush=True)
+        return ("tool_call", desc, [])
+
+    if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+        if not state.text_started:
+            print("Agent: ", end="", flush=True)
+            state.text_started = True
+        print(event.delta.content_delta, end="", flush=True)
+        return ("text", event.delta.content_delta, [])
+
+    return None
+
+
 async def process_message_streaming(
     user_input: str,
     message_history: list[ModelMessage],
@@ -214,31 +268,22 @@ async def process_message_streaming(
     Yields:
         Tuples of (event_type, data, updated_history) where:
         - event_type: "text", "tool_call", "done", or "error"
-        - data: The text chunk, tool name, or error message
+        - data: The text chunk, tool description, or error message
         - updated_history: The updated message history (only populated on "done")
     """
     try:
+        state = _StreamState()
         with capture_run_messages() as captured_messages:
-            async with agent.run_stream(
-                user_input,
-                message_history=message_history,
-                deps=deps or AgentDeps(),
-            ) as result:
-                text_started = False
-                async for text in result.stream_text(delta=True):
-                    if not text_started:
-                        print("Agent: ", end="", flush=True)
-                        text_started = True
-                    print(text, end="", flush=True)
-                    # Yield each text chunk to keep connection alive
-                    yield ("text", text, [])
+            async for event in agent.run_stream_events(
+                user_input, message_history=message_history, deps=deps or AgentDeps()
+            ):
+                result = _process_event(event, state, message_history, list(captured_messages))
+                if result:
+                    yield result
 
-        if text_started:
+        if state.text_started:
             print()
-
-        new_messages = list(captured_messages)
-        updated_history = [*message_history, *new_messages]
-        yield ("done", "", updated_history)
+        yield ("done", "", state.updated_history)
 
     except Exception as e:
         print(f"Error: {e}")
@@ -250,7 +295,6 @@ async def main() -> None:
     """Main function for the Dish Booking Agent."""
     message_history: list[ModelMessage] = []
 
-    # Use async context manager to keep MCP server connections alive
     async with agent:
         print("\nAgent is ready! Type 'quit' to exit.")
         print("Type 'reset' to clear the conversation history.")

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ActivityIndicator from "@/components/ActivityIndicator";
 import AuthControls from "@/components/AuthControls";
 import ChatInput from "@/components/ChatInput";
 import Message, { type MessageProps } from "@/components/Message";
@@ -25,6 +26,7 @@ export default function MessagePage(): JSX.Element {
     const [messages, setMessages] = useState<MessageProps[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState<boolean>(false);
+    const [activities, setActivities] = useState<string[]>([]);
     const processedInitialMessage = useRef<boolean>(false);
     const sessionIdRef = useRef<string | null>(null);
     const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -88,6 +90,7 @@ export default function MessagePage(): JSX.Element {
 
             setMessages((prev) => [...prev, userMessage]);
             setIsSending(true);
+            setActivities([]);
 
             let accumulatedText = "";
             let assistantMessageAdded = false;
@@ -141,6 +144,8 @@ export default function MessagePage(): JSX.Element {
                                 const eventData = JSON.parse(line.slice(6));
 
                                 if (eventData.type === "text") {
+                                    // Clear activities once text starts streaming
+                                    setActivities([]);
                                     accumulatedText += eventData.content;
 
                                     if (!assistantMessageAdded) {
@@ -169,7 +174,8 @@ export default function MessagePage(): JSX.Element {
                                         });
                                     }
                                 } else if (eventData.type === "tool_call") {
-                                    console.log("[Tool Call]", eventData.tool);
+                                    // Add tool call to activities
+                                    setActivities((prev) => [...prev, eventData.tool]);
                                 } else if (eventData.type === "error") {
                                     throw new Error(eventData.message);
                                 }
@@ -199,6 +205,7 @@ export default function MessagePage(): JSX.Element {
                 setError("Unable to reach the booking service. Please try again.");
             } finally {
                 setIsSending(false);
+                setActivities([]);
             }
         },
         [ensureSessionId, token]
@@ -246,11 +253,11 @@ export default function MessagePage(): JSX.Element {
         ensureSessionId();
     };
 
-    /** Keep the latest message in view whenever messages change. */
+    /** Keep the latest message in view whenever messages or activities change. */
     useEffect(() => {
         if (!isReady) return;
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isReady]);
+    }, [messages, activities, isReady]);
 
     if (!isReady) {
         return null;
@@ -292,6 +299,9 @@ export default function MessagePage(): JSX.Element {
                             {messages.map((message, index) => (
                                 <Message key={index} {...message} />
                             ))}
+                            {activities.length > 0 && (
+                                <ActivityIndicator activities={activities} />
+                            )}
                             <div ref={bottomRef} />
                         </div>
                     </div>

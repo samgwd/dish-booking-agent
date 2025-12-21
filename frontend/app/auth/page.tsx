@@ -26,7 +26,7 @@ export default function AuthPage(): JSX.Element {
                 </div>
 
                 <p className="text-sm text-slate-300 mb-6">
-                    Sign in with your organisation account.
+                    Sign in to your account.
                 </p>
 
                 <div className="flex flex-col gap-3">
