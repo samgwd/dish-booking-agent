@@ -15,19 +15,29 @@ export default function ActivityIndicator({ activities }: ActivityIndicatorProps
 
     return (
         <div className="flex gap-4 animate-fadeIn">
-            {/* Pulsing avatar placeholder */}
+            {/* Pulsing robot avatar */}
             <div className="relative size-10 flex-shrink-0">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-50 animate-pulse" />
-                <div className="absolute inset-1 rounded-full bg-slate-900 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-60 animate-pulse" />
+                <div className="absolute inset-0.5 rounded-full bg-slate-900 flex items-center justify-center">
                     <svg
-                        className="w-5 h-5 text-indigo-400 animate-spin-slow"
+                        className="w-6 h-6 text-indigo-300"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                     >
-                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                        <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+                        {/* Robot head */}
+                        <rect x="4" y="8" width="16" height="12" rx="2" />
+                        {/* Antenna */}
+                        <line x1="12" y1="8" x2="12" y2="4" />
+                        <circle cx="12" cy="3" r="1" fill="currentColor" />
+                        {/* Eyes */}
+                        <circle cx="9" cy="13" r="1.5" fill="currentColor" />
+                        <circle cx="15" cy="13" r="1.5" fill="currentColor" />
+                        {/* Mouth */}
+                        <path d="M9 17h6" />
                     </svg>
                 </div>
             </div>

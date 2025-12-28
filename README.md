@@ -1,6 +1,14 @@
-# DiSH & Calendar Booking Agent
+# DiSH Meeting Room Booking Agent
 
-Pydantic AI agent that brokers room bookings (DiSH MCP) and calendar actions (Google Calendar MCP) with MCP over stdio. It can co‑ordinate room reservations with your calendar availability.
+An AI-powered assistant that seamlessly manages your meeting room bookings and calendar in one conversation. Simply ask it to book a room, check availability, or schedule meetings—it handles the coordination between DiSH room reservations and Google Calendar automatically.
+
+**Key Features:**
+- 🗓️ Natural language scheduling — *"Book me a room tomorrow at 2pm for an hour"*
+- 🔍 Smart availability checking across rooms and calendars
+- 🔄 Automatic coordination between room bookings and calendar events
+- 💬 Conversational interface with streaming responses
+
+Built with [Pydantic AI](https://ai.pydantic.dev/) and the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) for extensible tool integration.
 
 ## Prerequisites
 
@@ -77,14 +85,14 @@ The backend also reads from `backend/.env` for additional settings. See `backend
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js)                       │
-│                        http://localhost:3000                     │
+│                         Frontend (Next.js)                      │
+│                        http://localhost:3000                    │
 └─────────────────────────────────┬───────────────────────────────┘
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Backend API (FastAPI)                       │
-│                        http://localhost:8000                     │
+│                      Backend API (FastAPI)                      │
+│                        http://localhost:8000                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │ Pydantic AI │  │ DiSH MCP    │  │ Google Calendar MCP     │  │
 │  │   Agent     │──│  (rooms)    │  │  (calendar events)      │  │

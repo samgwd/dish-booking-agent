@@ -21,7 +21,6 @@ from src.mcp.loader import load_mcp_servers_with_env
 _project_root = Path(__file__).resolve().parent.parent.parent.parent
 load_dotenv(_project_root / ".env")
 
-# System prompt configuration
 SYSTEM_PROMPT = """\
 You manage both office room bookings (Dish MCP) and Google Calendar for the user. \
 Use Dish tools for room availability and booking; use Google Calendar tools to list \

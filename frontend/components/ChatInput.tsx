@@ -6,7 +6,8 @@ type ChatInputProps = {
   onSend?: (message: string) => Promise<void> | void;
 };
 
-const presets: readonly string[] = ["Draft an email", "Translate text", "Debug this code"];
+// TODO: Add presets
+const presets: readonly string[] = [];
 
 export default function ChatInput({ onSend }: ChatInputProps): JSX.Element {
   const [inputValue, setInputValue] = useState<string>("");

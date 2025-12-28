@@ -15,9 +15,6 @@ const signatureOf = (message: MessageProps): string =>
 const userAvatar =
     "https://lh3.googleusercontent.com/aida-public/AB6AXuDjK9X3BZOWoc9jiC5v0rOYSnRJdYSxF53hzeB9iyHyFxtdeoKH-9f81MD9GKb5MCwlx14xjpOOdJkv5zYwW8jipICJ2s9GzLA9BZCQFJFymZoDsNTgRrH5fEu4U1l3vxB7E2ehg0pLfA4iymFOLLPvotA331oedtMqsXJ5QnFG8OzxTWl5wabg6T3g7Ke2RmSQgbFViXTQBbCqWQhzZRb4l2pRJhA3jM0wn7puCca_HktpdYFcv0r9RUYpuh9NLBQ1ufxZhrhE9Eo";
 
-const assistantAvatar =
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuA1ORR1W1DJE0Mb41HZ2PPHaBJZsPGwKvhCmpWozZrvjBKIx_pfSQtlelyJFaiqAb_0HehE39oTKpqwGlLM2jICKKaCCd1g_qrYKdNCMROEz9rSEl8ofNfoRxf5m7T3DI1-QXhVM7OCeS9uVkBBnOPDftNwfSftgjab9el9n3G_QMojwKzEIsmOoTAoSgWuUTJkvJr5CuQbY6dM5IJvk2fFl04Wy_sNbktQR-8q7-sQFfQ4gpCW6BbWAXsxb22-dSoeXnbB9i3a9Ks";
-
 /** Chat transcript page that renders messages, handles sending, and syncs state to storage. */
 export default function MessagePage(): JSX.Element {
     const router = useRouter();
@@ -157,7 +154,7 @@ export default function MessagePage(): JSX.Element {
                                                 time: replyTime,
                                                 content: accumulatedText,
                                                 isUser: false,
-                                                avatarUrl: assistantAvatar
+                                                avatarUrl: ""
                                             }
                                         ]);
                                     } else {
@@ -196,7 +193,7 @@ export default function MessagePage(): JSX.Element {
                             time: replyTime,
                             content: "I processed your request but have no response to show.",
                             isUser: false,
-                            avatarUrl: assistantAvatar
+                            avatarUrl: ""
                         }
                     ]);
                 }
