@@ -1,0 +1,32 @@
+{
+    "mcpServers": {
+        "dish-mcp": {
+            "command": "${DISH_MCP_PATH}/.venv/bin/fastmcp",
+            "args": [
+                "run",
+                "${DISH_MCP_PATH}/src/mcp_server.py"
+            ],
+            "cwd": "${DISH_MCP_PATH}",
+            "transport": "stdio",
+            "env": {
+                "DISH_COOKIE": "",
+                "TEAM_ID": "",
+                "MEMBER_ID": ""
+            }
+        },
+        "google-calendar": {
+            "command": "docker",
+            "args": [
+                "run",
+                "--rm",
+                "-i",
+                "--mount",
+                "type=bind,src=${GOOGLE_OAUTH_CREDENTIALS},dst=/app/gcp-oauth.keys.json",
+                "--mount",
+                "type=volume,src=google-calendar-mcp_calendar-tokens,dst=/home/nodejs/.config/google-calendar-mcp",
+                "calendar-mcp"
+            ],
+            "transport": "stdio"
+        }
+    }
+}

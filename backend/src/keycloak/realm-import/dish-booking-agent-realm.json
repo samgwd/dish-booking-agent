@@ -1,0 +1,42 @@
+{
+  "realm": "dish-booking-agent",
+  "enabled": true,
+  "registrationAllowed": true,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "registrationEmailAsUsername": true,
+  "editUsernameAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "sslRequired": "external",
+  "loginTheme": "keywind",
+  "accountTheme": "keycloak.v2",
+  "emailTheme": "keycloak",
+  "clients": [
+    {
+      "clientId": "dish-booking-agent-frontend",
+      "name": "Dish Booking Agent (Frontend)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*"
+      }
+    }
+  ]
+}

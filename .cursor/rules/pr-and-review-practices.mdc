@@ -1,0 +1,27 @@
+---
+description: Pull request and code review guidelines
+alwaysApply: false
+---
+# Pull Request and Code Review Practices
+
+## Pull Request Guidelines
+
+### Draft PRs
+- **Create draft PRs soon after picking up a ticket**
+- Update the remote draft branch regularly (CI/CD failures are acceptable for drafts)
+- Use draft PRs to share progress and get early feedback
+- Convert to ready for review only when the PR is complete
+
+### PR Descriptions
+- **Use the PR template define in the .github folder**
+- When using `type: ignore` or `noqa` directives:
+  - **Justify their use in the PR description**
+  - Explain why the ignore was necessary
+  - Describe if you considered alternative approaches
+  - Example: "Added `type: ignore` on line 45 because mypy doesn't recognise the dynamic attribute from the third-party library. Investigated using a protocol but it would require extensive refactoring."
+
+### PR Size and Scope
+- Keep PRs focused and reasonably sized
+- Split large changes into multiple PRs when possible
+- Include relevant tests for new functionality
+- Update documentation when adding new features

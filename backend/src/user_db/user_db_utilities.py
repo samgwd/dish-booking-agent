@@ -1,0 +1,251 @@
+"""User database utilities."""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+
+from src.user_db import models
+from src.user_db.secrets import decrypt_secret, encrypt_secret
+from src.user_db.user_db import session_scope
+
+
+def create_user(email: str, password: str) -> models.User:
+    """Create a new user.
+
+    Args:
+        email: The email of the user.
+        password: The password of the user.
+
+    Returns:
+        The created user.
+    """
+    with session_scope() as session:
+        user = models.User(email=email)
+        session.add(user)
+        session.flush()
+        return user
+
+
+def _coerce_user_id(user_id: str | uuid.UUID) -> uuid.UUID:
+    """Coerce a user id into a UUID.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        The parsed UUID.
+    """
+    return user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(user_id)
+
+
+def logout_user(user_id: str | uuid.UUID) -> bool:
+    """Log out a user by marking them inactive.
+
+    IMPORTANT: This function intentionally re-fetches the user within the current session
+    to avoid "detached instance" updates silently not persisting.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        True if the user existed and was updated, otherwise False.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        db_user = session.get(models.User, user_uuid)
+        if db_user is None:
+            return False
+        db_user.is_active = False
+        return True
+
+
+def delete_user(user_id: str | uuid.UUID) -> bool:
+    """Delete a user by ID.
+
+    IMPORTANT: This function re-fetches the user within the current session so the delete
+    is tracked and persisted.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        True if the user existed and was deleted, otherwise False.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        db_user = session.get(models.User, user_uuid)
+        if db_user is None:
+            return False
+        session.delete(db_user)
+        return True
+
+
+def get_user_by_email(email: str) -> models.User | None:
+    """Get a user by email.
+
+    Args:
+        email: The email of the user.
+
+    Returns:
+        The user if found, None otherwise.
+    """
+    with session_scope() as session:
+        return session.scalar(select(models.User).where(models.User.email == email))
+
+
+def get_user_by_id(user_id: str | uuid.UUID) -> models.User | None:
+    """Get a user by ID.
+
+    Args:
+        user_id: The ID of the user (UUID or UUID string).
+
+    Returns:
+        The user if found, None otherwise.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        return session.scalar(select(models.User).where(models.User.id == user_uuid))
+
+
+def ensure_user_exists(
+    keycloak_sub: str | uuid.UUID,
+    email: str | None = None,
+) -> models.User:
+    """Ensure a user exists in the local database, creating if necessary.
+
+    This is used to auto-provision Keycloak users in the local database
+    on first interaction (e.g., when storing secrets).
+
+    Args:
+        keycloak_sub: The Keycloak subject (user ID) as a UUID or UUID string.
+        email: Optional email address from Keycloak.
+
+    Returns:
+        The existing or newly created User object.
+    """
+    user_uuid = _coerce_user_id(keycloak_sub)
+    with session_scope() as session:
+        user = session.scalar(select(models.User).where(models.User.id == user_uuid))
+        if user:
+            return user
+
+        placeholder_email = email or f"{user_uuid}@keycloak.local"
+        user = models.User(
+            id=user_uuid,
+            email=placeholder_email,
+            is_active=True,
+        )
+        session.add(user)
+        session.flush()
+        return user
+
+
+def set_user_secret(user_id: str | uuid.UUID, key: str, value: str) -> models.UserSecret | None:
+    """Store or update an encrypted secret for a user.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name (e.g., "DISH_COOKIE").
+        value: The plaintext secret value to encrypt and store.
+
+    Returns:
+        The created or updated UserSecret instance.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    encrypted = encrypt_secret(value)
+    with session_scope() as session:
+        stmt = (
+            insert(models.UserSecret)
+            .values(user_id=user_uuid, key=key, encrypted_value=encrypted)
+            .on_conflict_do_update(
+                constraint="uq_user_secrets_user_id_key",
+                set_={"encrypted_value": encrypted, "updated_at": models.utcnow()},
+            )
+            .returning(models.UserSecret)
+        )
+        result = session.scalar(stmt)
+        return result
+
+
+def get_user_secret(user_id: str | uuid.UUID, key: str) -> str | None:
+    """Retrieve and decrypt a user's secret.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name to retrieve.
+
+    Returns:
+        The decrypted secret value, or None if not found.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secret = session.scalar(
+            select(models.UserSecret).where(
+                models.UserSecret.user_id == user_uuid,
+                models.UserSecret.key == key,
+            )
+        )
+        if not secret:
+            return None
+        return decrypt_secret(secret.encrypted_value)
+
+
+def get_all_user_secrets(user_id: str | uuid.UUID) -> dict[str, str]:
+    """Get all decrypted secrets for a user as a dict.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        A dictionary mapping secret keys to their decrypted values.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secrets = session.scalars(
+            select(models.UserSecret).where(models.UserSecret.user_id == user_uuid)
+        ).all()
+        return {s.key: decrypt_secret(s.encrypted_value) for s in secrets}
+
+
+def delete_user_secret(user_id: str | uuid.UUID, key: str) -> bool:
+    """Delete a specific secret for a user.
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+        key: The secret key name to delete.
+
+    Returns:
+        True if the secret existed and was deleted, False otherwise.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secret = session.scalar(
+            select(models.UserSecret).where(
+                models.UserSecret.user_id == user_uuid,
+                models.UserSecret.key == key,
+            )
+        )
+        if not secret:
+            return False
+        session.delete(secret)
+        return True
+
+
+def list_user_secret_keys(user_id: str | uuid.UUID) -> list[str]:
+    """List all secret keys for a user (without decrypting values).
+
+    Args:
+        user_id: The user ID as a UUID or UUID string.
+
+    Returns:
+        A list of secret key names.
+    """
+    user_uuid = _coerce_user_id(user_id)
+    with session_scope() as session:
+        secrets = session.scalars(
+            select(models.UserSecret).where(models.UserSecret.user_id == user_uuid)
+        ).all()
+        return [s.key for s in secrets]
