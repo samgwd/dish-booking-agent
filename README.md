@@ -2,6 +2,8 @@
 
 An AI-powered assistant that seamlessly manages your meeting room bookings and calendar in one conversation. Simply ask it to book a room, check availability, or schedule meetings. It handles the coordination between DiSH room reservations and Google Calendar automatically.
 
+The meeting room booking website for my office (DiSH) was pretty terrible and made booking recurring meetings difficult and time consuming. I built this agent to save on all the manual time spent block booking meeting rooms. It has so far saved me so much time and I use it every week!
+
 **Key Features:**
 - 🗓️ Natural language scheduling — *"Book me a room tomorrow at 2pm for an hour"*
 - 🔍 Smart availability checking across rooms and calendars
